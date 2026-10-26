@@ -1,0 +1,87 @@
+# ADAPT-X: Self-Healing Quadruped Locomotion Config
+# Optimized for RTX 5050 Laptop GPU (Safe Memory & Thermal Bounds)
+
+system:
+  device: "cuda"                  # "cuda" or "cpu"
+  cuda_device_id: 0
+  max_vram_gb: 1.5                # Hard cap to ensure zero laptop freezing
+  num_cpu_threads: 4              # Cap CPU load to avoid 100% core lockup
+  seed: 42
+  headless: true                  # Train headless; render only during evaluation
+
+robot:
+  name: "adaptx_quadruped"
+  num_legs: 4
+  dof_per_leg: 3
+  total_dof: 12
+  # Nominal standing configuration (radians)
+  # Legs order: [FR, FL, RR, RL], Joints order: [hip_abduction, hip_pitch, knee_pitch]
+  default_joint_angles:
+    fr_hip: 0.0
+    fr_thigh: 0.6
+    fr_calf: -1.2
+    fl_hip: 0.0
+    fl_thigh: 0.6
+    fl_calf: -1.2
+    rr_hip: 0.0
+    rr_thigh: 0.6
+    rr_calf: -1.2
+    rl_hip: 0.0
+    rl_thigh: 0.6
+    rl_calf: -1.2
+  
+  action_scale: 0.4               # Policy outputs target offsets in [-action_scale, +action_scale] rad
+  kp: 25.0                        # PD controller proportional gain (N*m/rad)
+  kd: 0.8                         # PD controller derivative gain (N*m*s/rad)
+  torque_limit: 18.0              # Max motor torque (Nm)
+
+environment:
+  dt: 0.02                        # 50 Hz policy control step
+  sim_substeps: 10                # 500 Hz physics simulation (0.002s)
+  episode_length_s: 20.0          # Max 1000 steps per episode
+  target_height: 0.28             # Desired nominal torso height (meters)
+  
+  # Velocity command ranges (sampled randomly during training)
+  command_ranges:
+    lin_vel_x: [0.0, 1.2]         # Forward speed (m/s)
+    lin_vel_y: [-0.3, 0.3]        # Lateral drift speed (m/s)
+    ang_vel_yaw: [-0.8, 0.8]      # Yaw rotation rate (rad/s)
+
+rewards:
+  # Positive tracking objectives
+  tracking_lin_vel: 2.0           # Gaussian tracking: exp(-||v_xy - cmd||^2 / sigma)
+  tracking_ang_vel: 1.0           # Gaussian tracking: exp(-|w_z - cmd|^2 / sigma)
+  healthy_bonus: 0.5              # Alive bonus per step
+  
+  # Penalties & Regularization
+  lin_vel_z_penalty: -2.0         # Minimize vertical bouncing
+  ang_vel_xy_penalty: -0.05       # Minimize pitch/roll wobble
+  orientation_penalty: -1.0       # Keep torso level with gravity
+  base_height_penalty: -10.0      # Penalize squatting or launching
+  torque_penalty: -0.0001         # Energy efficiency (sum tau^2)
+  action_rate_penalty: -0.008     # Action smoothness: ||a_t - a_{t-1}||^2
+  joint_acc_penalty: -0.00001     # Minimize abrupt joint accelerations
+
+ppo:
+  # RTX 5050 Safe Batch Sizing:
+  num_envs: 16                    # 16 vectorized environments (keeps VRAM < 1.2 GB)
+  rollout_steps: 256              # 256 steps per env -> 4,096 transitions per rollout
+  total_timesteps: 500000         # 500k steps total (~20-25 mins on RTX 5050)
+  
+  # Optimization
+  num_epochs: 4                   # PPO optimization epochs per rollout
+  num_minibatches: 4              # Minibatch size = 4096 / 4 = 1024
+  lr: 0.0003                      # AdamW learning rate
+  lr_decay: true                  # Linear decay to 0 over training
+  gamma: 0.99                     # Discount factor
+  gae_lambda: 0.95                # GAE smoothing factor
+  clip_range: 0.2                 # PPO clipping epsilon
+  entropy_coef: 0.01              # Exploration bonus
+  value_coef: 0.5                 # Value loss weight
+  max_grad_norm: 0.5              # Gradient clipping threshold
+
+logging:
+  save_freq_steps: 50000          # Save checkpoint every 50k steps
+  log_freq_steps: 4096            # Print summary every rollout iteration
+  checkpoint_dir: "./checkpoints"
+  log_dir: "./logs"
