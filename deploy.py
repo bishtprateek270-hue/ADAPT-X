@@ -78,8 +78,12 @@ def run_deployment_simulation(onnx_path, duration_seconds=15.0, damage="amputate
     print(f"Hardware Failure   : Injected [{damage.upper()}] on {leg.upper()} leg at step {damage_step}")
     print("=" * 70)
 
-    # Initialize environment and sim-to-real wrapper
-    env = QuadrupedEnv()
+    # Initialize environment in clean 4-legged baseline stance (controlled via CLI)
+    deploy_cfg = {
+        "curriculum": {"stage": 2, "push_disturbances": False},
+        "damage_injection": {"enabled": False}  # Controlled exclusively by CLI --damage parameter
+    }
+    env = QuadrupedEnv(config=deploy_cfg)
     sim2real = Sim2RealWrapper(action_delay_steps=1, joint_noise_std=0.005, gyro_noise_std=0.01)
     controller = OnboardRobotController(onnx_path)
 
