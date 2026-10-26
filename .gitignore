@@ -8,6 +8,8 @@ checkpoints/
 logs/
 *.pt
 *.pth
+!deployments/*.onnx
+!deployments/*.pt
 
 # Environments and IDE
 .env
