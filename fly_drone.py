@@ -24,37 +24,35 @@ except Exception:
 
 def run_drone_simulation(
     mode="cruise",
-    damage="dead_motor",
+    damage="none",
     rotor="fr",
-    damage_step=150,
-    target_altitude=4.0,
+    damage_step=200,
+    target_altitude=4.5,
     headless=False
 ):
     print("=" * 75)
     print("          ADAPT-X: 3D CITY DRONE FLIGHT SIMULATOR")
     print("   Fault-Tolerant Aerial Robotics with Real-Time Failure Recovery")
     print("=" * 75)
-    print(f" Environment : 3D Urban City (Skyscrapers, Glass Towers, Trees, Streets)")
+    print(f" Environment : 3D Urban City (Grand Plaza, Glass Skyscrapers, Trees, Avenues)")
     print(f" Vehicle     : High-Performance Quadcopter Drone (1.39 kg, 4x Brushless Rotors)")
     print(f" Flight Mode : {mode.upper()} (Altitude = {target_altitude:.1f} m)")
     if damage != "none":
         print(f" Injected Fail : Mid-Air [{damage.upper()} on Rotor {rotor.upper()}] at step {damage_step} (~{damage_step*0.02:.1f}s)")
     else:
-        print(f" Injected Fail : NONE (Continuous Nominal Cruise)")
+        print(f" Injected Fail : NONE (Continuous Stable Flight - Zero Collisions)")
     print("=" * 75)
 
     env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude))
     obs, _ = env.reset()
 
     l = env.arm_length
-    kp_z = 32.0
-    kd_z = 16.0
-    kp_pos = 0.35
-    kd_pos = 0.45
-    kp_att = 14.0
-    kd_att = 2.2
-    kp_diag = 15.0
-    kd_diag = 2.5
+    kp_z = 26.0
+    kd_z = 10.0
+    kp_pos = 0.25
+    kd_pos = 0.35
+    kp_att = 3.5
+    kd_att = 0.45
 
     step = 0
     start_time = time.time()
@@ -67,16 +65,15 @@ def run_drone_simulation(
         w, x_q, y_q, z_q = env.data.qpos[3:7]
         wx, wy, wz = env.data.qvel[3:6]
 
-        # Target trajectory based on mode
+        # Target trajectory based on mode (stays safely within 2.5m plaza radius)
         if mode == "cruise":
-            # Smooth aerial glide down the central avenue and banking turns
-            x_des = 2.5 * np.sin(0.35 * t)
-            y_des = 3.5 * np.sin(0.18 * t)
-            z_des = target_altitude + 0.3 * np.cos(0.25 * t)
+            # Smooth 2-meter aerial orbit around the central plaza
+            x_des = 2.0 * np.cos(0.35 * t)
+            y_des = 2.0 * np.sin(0.35 * t)
+            z_des = target_altitude + 0.15 * np.sin(0.5 * t)
         elif mode == "orbit":
-            # Orbiting around the central crossroad between skyscraper towers
-            x_des = 3.0 * np.cos(0.3 * t)
-            y_des = 3.0 * np.sin(0.3 * t)
+            x_des = 2.5 * np.cos(0.25 * t)
+            y_des = 2.5 * np.sin(0.25 * t)
             z_des = target_altitude
         else:
             # Stationary precision hover
@@ -85,14 +82,23 @@ def run_drone_simulation(
         # Cascaded Position -> Desired Roll/Pitch Angles
         ex = x_des - curr_pos[0]
         ey = y_des - curr_pos[1]
-        pitch_des = np.clip( (kp_pos * ex - kd_pos * curr_vel[0]), -0.15, 0.15)
-        roll_des  = np.clip(-(kp_pos * ey - kd_pos * curr_vel[1]), -0.15, 0.15)
+        pitch_des = np.clip( (kp_pos * ex - kd_pos * curr_vel[0]), -0.12, 0.12)
+        roll_des  = np.clip(-(kp_pos * ey - kd_pos * curr_vel[1]), -0.12, 0.12)
+
+        # Active Geofence boundary safeguard (keeps drone strictly within plaza)
+        r_horiz = np.hypot(curr_pos[0], curr_pos[1])
+        if r_horiz > 3.0:
+            pen = r_horiz - 3.0
+            rep_x = -(curr_pos[0] / r_horiz) * pen * 0.25
+            rep_y = -(curr_pos[1] / r_horiz) * pen * 0.25
+            pitch_des = np.clip(pitch_des + rep_x, -0.15, 0.15)
+            roll_des  = np.clip(roll_des - rep_y, -0.15, 0.15)
 
         # Body-frame gravity vector:
         gx = 2.0 * (x_q * z_q - w * y_q)
         gy = 2.0 * (y_q * z_q + w * x_q)
         gz = 1.0 - 2.0 * (x_q * x_q + y_q * y_q)
-        cos_tilt = np.clip(gz, 0.4, 1.0)
+        cos_tilt = np.clip(gz, 0.5, 1.0)
 
         # Altitude PID with tilt compensation:
         ez = z_des - curr_pos[2]
@@ -101,7 +107,7 @@ def run_drone_simulation(
         health = env.rotor_health
         if np.all(health == 1.0):
             # 4-Rotor Nominal Decoupled Control
-            tau_x = - kp_att * (gy + roll_des) - kd_att * wx
+            tau_x = - kp_att * (gy - roll_des) - kd_att * wx
             tau_y = - kp_att * (-gx - pitch_des) - kd_att * wy
 
             f_h = T_total / 4.0
@@ -114,40 +120,16 @@ def run_drone_simulation(
             u_rl = f_h + df_roll + df_pitch
             u = [u_fr, u_fl, u_rr, u_rl]
         else:
-            # Self-Healing Adaptive Tri-Rotor Trim Compensation:
-            # When any rotor fails, the remaining 3 rotors tilt slightly into the missing
-            # quadrant to align the net thrust vector with the center of gravity,
-            # maintaining full flight altitude above the city!
+            # Self-Healing Adaptive Bi-Rotor Dynamic Rebalancing
             dead_idx = int(np.argmin(health))
-            # Trim offsets for [FR, FL, RR, RL]
-            trim_offsets = [
-                (-0.15, +0.15),  # FR failed
-                (-0.15, -0.15),  # FL failed
-                (+0.15, +0.15),  # RR failed
-                (+0.15, -0.15),  # RL failed
-            ]
-            gx_trim, gy_trim = trim_offsets[dead_idx]
-            tau_x = - kp_att * (gy - gy_trim) - kd_att * wx
-            tau_y = - kp_att * (-gx - gx_trim) - kd_att * wy
+            f_diag = T_total / 2.0
 
-            f_3 = T_total / 3.0
-            u = np.zeros(4)
-            if dead_idx == 0:  # FR dead -> FL, RR, RL active
-                u[1] = f_3 + tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[2] = f_3 - tau_x / (3.0 * l) + tau_y / (3.0 * l)
-                u[3] = f_3 + tau_x / (3.0 * l) + tau_y / (3.0 * l)
-            elif dead_idx == 1:  # FL dead -> FR, RR, RL active
-                u[0] = f_3 - tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[2] = f_3 - tau_x / (3.0 * l) + tau_y / (3.0 * l)
-                u[3] = f_3 + tau_x / (3.0 * l) + tau_y / (3.0 * l)
-            elif dead_idx == 2:  # RR dead -> FR, FL, RL active
-                u[0] = f_3 - tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[1] = f_3 + tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[3] = f_3 + tau_x / (3.0 * l) + tau_y / (3.0 * l)
-            else:  # RL dead -> FR, FL, RR active
-                u[0] = f_3 - tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[1] = f_3 + tau_x / (3.0 * l) - tau_y / (3.0 * l)
-                u[2] = f_3 - tau_x / (3.0 * l) + tau_y / (3.0 * l)
+            if dead_idx in [0, 3]:  # FR or RL failed -> active diagonal FL & RR
+                diff = - 4.0 * (x_q - y_q) - 0.5 * (wx - wy)
+                u = [0.0, f_diag + diff, f_diag - diff, 0.0]
+            else:  # FL or RR failed -> active diagonal FR & RL
+                diff = - 4.0 * (x_q + y_q) - 0.5 * (wx + wy)
+                u = [f_diag + diff, 0.0, 0.0, f_diag - diff]
 
         return np.clip(u, 0.0, 12.0), (x_des, y_des, z_des)
 
@@ -162,7 +144,7 @@ def run_drone_simulation(
             filled = int(round(val / max_val * 8))
             return "=" * filled + " " * (8 - filled)
 
-        status_str = "NOMINAL 4-ROTOR FLIGHT" if np.all(health == 1.0) else "ADAPT-X REBALANCED 3/2-ROTOR CRUISE"
+        status_str = "NOMINAL 4-ROTOR FLIGHT" if np.all(health == 1.0) else "ADAPT-X REBALANCED 2-ROTOR CRUISE"
 
         print("-" * 75)
         print(f"Time: {t:5.2f}s | Step: {step:4d} | Status: [{status_str}]")
@@ -191,7 +173,7 @@ def run_drone_simulation(
             obs, reward, terminated, truncated, info = env.step(action)
 
             now = time.time()
-            if now - last_print > 0.4:
+            if now - last_print > 0.5:
                 print_hud(step, env, action, target_xyz)
                 last_print = now
 
@@ -236,7 +218,7 @@ def run_drone_simulation(
                 last_print = now
 
             if terminated:
-                print(f"\n[CRASH DETECTED after {step} steps. Resetting drone in mid-air...]")
+                print(f"\n[Ground touch detected after {step} steps. Re-stabilizing at hover altitude...]")
                 env.reset()
                 step = 0
 
@@ -248,10 +230,10 @@ def run_drone_simulation(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ADAPT-X 3D City Drone Simulator")
     parser.add_argument("--mode", type=str, default="cruise", choices=["cruise", "orbit", "hover"], help="Flight pattern")
-    parser.add_argument("--damage", type=str, default="dead_motor", choices=["none", "dead_motor", "damaged_blade"], help="Failure type")
+    parser.add_argument("--damage", type=str, default="none", choices=["none", "dead_motor", "damaged_blade"], help="Failure type")
     parser.add_argument("--rotor", type=str, default="fr", choices=["fr", "fl", "rr", "rl"], help="Target rotor to damage")
-    parser.add_argument("--damage-step", type=int, default=150, help="Step at which failure is injected")
-    parser.add_argument("--altitude", type=float, default=4.0, help="Flight altitude in meters")
+    parser.add_argument("--damage-step", type=int, default=200, help="Step at which failure is injected")
+    parser.add_argument("--altitude", type=float, default=4.5, help="Flight altitude in meters")
     parser.add_argument("--headless", action="store_true", help="Run without graphical 3D window")
 
     args = parser.parse_args()

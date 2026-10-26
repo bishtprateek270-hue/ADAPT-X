@@ -18,7 +18,7 @@ class CityDroneEnv(gym.Env):
     """
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
-    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.0)):
+    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.5)):
         super().__init__()
         if mujoco is None:
             raise ImportError("MuJoCo is required. Install via `pip install mujoco`.")
