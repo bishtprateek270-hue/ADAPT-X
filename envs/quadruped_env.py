@@ -104,6 +104,13 @@ class QuadrupedEnv(gym.Env):
         self.history_dim = self.history_len * self.single_proprio_dim
         self.history_buf = np.zeros((self.history_len, self.single_proprio_dim), dtype=np.float32)
 
+        # Phase 4: Curriculum Learning & Disturbance Modeling
+        curriculum_cfg = self.config.get("curriculum", {})
+        self.curriculum_stage = int(curriculum_cfg.get("stage", 1))  # 1: prebroken, 2: dynamic, 3: stress
+        self.push_disturbances = bool(curriculum_cfg.get("push_disturbances", False))
+        self.push_interval = int(curriculum_cfg.get("push_interval", 150))
+        self.push_magnitude = float(curriculum_cfg.get("push_magnitude", 15.0))  # Force in Newtons
+
         self.viewer = None
 
     def inject_fault(self, fault_type, leg="fr", joint_subidx=None):
@@ -151,8 +158,15 @@ class QuadrupedEnv(gym.Env):
         self.fault_joints = []
         self.locked_angles = {}
 
-        # Schedule random mid-episode failure if enabled
-        if self.damage_enabled and (np.random.rand() < self.failure_prob):
+        # Schedule failure according to Curriculum Stage
+        if self.curriculum_stage == 1:
+            # Stage 1: Spawn already damaged (100% pre-broken) to discover 3-legged locomotion
+            f_type = np.random.choice(self.allowed_failure_types)
+            f_leg = np.random.choice(self.LEGS)
+            self.inject_fault(f_type, f_leg)
+            self.fault_trigger_step = 0
+        elif self.damage_enabled and (np.random.rand() < self.failure_prob):
+            # Stage 2/3: Dynamic mid-stride failure transition
             self.fault_trigger_step = np.random.randint(self.trigger_range[0], self.trigger_range[1])
             self._scheduled_fault_type = np.random.choice(self.allowed_failure_types)
             self._scheduled_leg = np.random.choice(self.LEGS)
@@ -221,6 +235,14 @@ class QuadrupedEnv(gym.Env):
         # Target angles via PD control: q_des = q_nominal + action * scale
         target_q = self.default_joint_pos + (action * self.action_scale)
 
+        # Apply random external push disturbance (Search & Rescue stress test)
+        if self.push_disturbances and (self.current_step % self.push_interval == 0) and (self.data is not None):
+            impulse = np.random.uniform(-self.push_magnitude, self.push_magnitude, size=3)
+            impulse[2] = 0.0  # Horizontal push
+            self.data.qfrc_applied[0:3] = impulse
+        elif self.data is not None:
+            self.data.qfrc_applied[0:3] = 0.0
+
         # Simulate physics substeps with damage modeling
         total_torque = 0.0
         if self.model is not None and self.data is not None:
@@ -240,7 +262,6 @@ class QuadrupedEnv(gym.Env):
                     elif self.fault_type == "locked_joint":
                         for j in self.fault_joints:
                             lock_angle = self.locked_angles.get(j, self.default_joint_pos[j])
-                            # Stiff locking spring-damper to hold frozen position
                             torques[j] = 120.0 * (lock_angle - q[j]) - 10.0 * dq[j]
 
                     elif self.fault_type == "weakened_motor":
@@ -274,11 +295,14 @@ class QuadrupedEnv(gym.Env):
         ang_vel = self.data.qvel[3:6]
         base_z = self.data.qpos[2]
 
-        # 1. Forward Tracking: Combination of exponential alignment + direct forward velocity bonus
+        # 1. Forward Tracking & Propulsion (Heavy incentive to drive forward)
         vel_err = np.sum(np.square(lin_vel[0:2] - self.commands[0:2]))
         r_lin_vel = 2.0 * np.exp(-vel_err / 0.25)
-        # Direct reward for forward velocity matching target
-        r_forward_progress = 3.0 * min(lin_vel[0], self.commands[0]) if lin_vel[0] > 0 else 2.0 * lin_vel[0]
+        # Direct reward for forward velocity
+        r_forward_progress = 5.0 * min(lin_vel[0], self.commands[0]) if lin_vel[0] > 0 else 2.5 * lin_vel[0]
+
+        # Break frozen tripod behavior: penalize standing still when commanded to walk
+        r_standstill = -1.5 if (self.commands[0] > 0.25 and lin_vel[0] < 0.06) else 0.0
 
         # 2. Yaw rate tracking
         yaw_err = np.square(ang_vel[2] - self.commands[2])
@@ -305,6 +329,7 @@ class QuadrupedEnv(gym.Env):
         total_reward = (
             r_lin_vel +
             r_forward_progress +
+            r_standstill +
             r_ang_vel +
             r_height +
             r_lin_vel_z +

@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.14-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2Bcu128-red.svg)
 ![MuJoCo](https://img.shields.io/badge/Physics-MuJoCo%203.17-orange.svg)
-![Status](https://img.shields.io/badge/Status-Phase%203%20Adaptive%20Ready-green.svg)
+![Status](https://img.shields.io/badge/Status-Phase%204%20Curriculum%20Active-green.svg)
 
 ---
 
@@ -37,14 +37,18 @@ When rovers, drones, or legged robots in remote environments (such as disaster z
   - [x] Locked joint mode (frozen angle / rigid peg leg)
   - [x] Weakened actuator mode (25% torque output / thermal throttle)
   - [x] Amputated limb mode (power cut to complete 3-joint leg)
-  - [x] Randomized mid-episode fault injector (`trigger_step_range: [150, 400]`)
   - [x] 100% Damage Survival Rate achieved on Phase 2 evaluation benchmark
 - [x] **Phase 3: Adaptive Policy Architecture (Self-Healing Intelligence)**
   - [x] Proprioceptive History Buffer ($20 \text{ steps} \times 42 \text{ dims} = 840 \text{ dims}$)
   - [x] Temporal Latent Encoder (`agents/adaptive_ppo.py`) producing $\mathbf{z}_t \in \mathbb{R}^{16}$
   - [x] Adaptive Policy Network $\pi(a_t \mid s_t, \mathbf{z}_t)$
-  - [x] Latent shift monitoring CLI (`eval_adaptive.py`) measuring $||\Delta \mathbf{z}||$
-- [ ] **Phase 4: Curriculum Learning & 3-Legged Recovery Benchmark**
+  - [x] Massive $||\Delta \mathbf{z}|| = 18.5$ neural adaptation shift verified under limb loss
+- [x] **Phase 4: Curriculum Learning & 3-Legged Recovery Benchmark**
+  - [x] Stage 1: Pre-broken 3-legged hopping/gait discovery
+  - [x] Stage 2: Dynamic mid-stride transition with forward velocity retention
+  - [x] Stage 3: Search & Rescue stress test with external force impulses
+  - [x] Multi-stage curriculum trainer (`train_curriculum.py`)
+  - [x] Velocity retention benchmarking CLI (`eval_curriculum.py`)
 - [ ] **Phase 5: Sim-to-Real Readiness & Model Export (ONNX)**
 
 ---
@@ -57,21 +61,27 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco pyyaml numpy
 ```
 
-### 2. Training Phase 3: Adaptive Self-Healing Policy
-Train the policy with the temporal history encoder under randomized mid-stride damage:
+### 2. Training Phase 4: Staged Curriculum Locomotion
+Warm-start from the Phase 3 adaptive model and discover true 3-legged marching gaits:
 ```bash
-# Full Phase 3 training (500k steps, ~12-15 mins on RTX 5050, <40MB VRAM)
-py -3.14 train_adaptive.py --config configs/phase3_adaptive_config.yaml
+# Stage 1: Pre-broken 3-leg locomotion discovery
+py -3.14 train_curriculum.py --stage 1 --resume checkpoints/phase3/best_policy.pt
+
+# Stage 2: Dynamic mid-stride failure transition with forward momentum
+py -3.14 train_curriculum.py --stage 2 --resume checkpoints/phase4/stage_1/best_policy.pt
+
+# Stage 3: Extreme Search & Rescue stress testing with push impulses
+py -3.14 train_curriculum.py --stage 3 --resume checkpoints/phase4/stage_2/best_policy.pt
 ```
 
-### 3. Evaluating Adaptive Gait Recalculation
-Benchmark the adaptive policy and monitor real-time neural state adaptation $||\Delta \mathbf{z}||$:
+### 3. Evaluating 3-Legged Velocity Retention
+Benchmark how fast the quadruped marches using only 3 functional limbs:
 ```bash
-# Test adaptation to an amputated Front-Right limb at step 200
-py -3.14 eval_adaptive.py --checkpoint checkpoints/phase3/best_policy.pt --damage amputated_leg --leg fr
+# Evaluate Stage 1 (Pre-broken 3-leg gait)
+py -3.14 eval_curriculum.py --checkpoint checkpoints/phase4/stage_1/best_policy.pt --stage 1 --damage amputated_leg --leg fr
 
-# Test adaptation to a frozen Rear-Left locked joint
-py -3.14 eval_adaptive.py --checkpoint checkpoints/phase3/best_policy.pt --damage locked_joint --leg rl
+# Evaluate Stage 2 (Dynamic transition + Velocity retention)
+py -3.14 eval_curriculum.py --checkpoint checkpoints/phase4/stage_2/best_policy.pt --stage 2 --damage amputated_leg --leg fr
 ```
 ---
 

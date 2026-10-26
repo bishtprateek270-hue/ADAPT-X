@@ -1,0 +1,81 @@
+# ADAPT-X: Phase 4 Curriculum Learning & Asymmetric Gait Discovery
+# Stage 1: Pre-broken 3-leg locomotion discovery
+# Stage 2: Dynamic mid-stride transition with forward momentum
+# Stage 3: Search & Rescue stress test with external force impulses
+# Optimized for RTX 5050 Laptop GPU (Safe Memory & Thermal Caps)
+
+system:
+  device: "cuda"
+  cuda_device_id: 0
+  max_vram_gb: 1.5
+  num_cpu_threads: 4
+  seed: 42
+  headless: true
+
+robot:
+  name: "adaptx_quadruped"
+  num_legs: 4
+  dof_per_leg: 3
+  total_dof: 12
+  action_scale: 0.4
+  kp: 25.0
+  kd: 0.8
+  torque_limit: 18.0
+
+environment:
+  dt: 0.02                        # 50 Hz control loop
+  sim_substeps: 10                # 500 Hz physics
+  episode_length_s: 20.0
+  target_height: 0.28
+  
+  command_ranges:
+    lin_vel_x: [0.35, 0.75]       # Positive forward marching command
+    lin_vel_y: [-0.15, 0.15]
+    ang_vel_yaw: [-0.3, 0.3]
+
+# ================= PHASE 4: CURRICULUM CONFIGURATION =================
+curriculum:
+  stage: 1                        # Default: 1 (Pre-broken 3-leg training)
+  push_disturbances: false        # Enabled in Stage 3
+  push_interval: 150              # Apply push disturbance every 3 seconds
+  push_magnitude: 12.0            # Horizontal impulse force (Newtons)
+
+# ================= PHASE 3: ADAPTIVE TEMPORAL HISTORY =================
+adaptive:
+  history_len: 20                 # Last 20 timesteps = 0.40s rolling history
+  latent_dim: 16                  # Latent morphology space z_t
+
+damage_injection:
+  enabled: true
+  failure_prob: 0.8               # 80% damaged episodes
+  trigger_step_range: [150, 350]
+  failure_types:
+    - "amputated_leg"              # Complete power cut to 3-joint leg
+    - "locked_joint"               # Seized peg leg
+    - "dead_motor"                # Limp joint
+    - "weakened_motor"             # 25% torque
+  legs:
+    - "fr"
+    - "fl"
+    - "rr"
+    - "rl"
+
+ppo:
+  num_envs: 16                    # Safe parallel environments for laptop
+  rollout_steps: 256              # 4,096 transitions per rollout batch
+  total_timesteps: 500000         # ~12-15 mins on RTX 5050
+  num_epochs: 4
+  num_minibatches: 4
+  lr: 0.00025
+  lr_decay: true
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  entropy_coef: 0.015             # Increased entropy for asymmetric gait discovery
+  value_coef: 0.5
+  max_grad_norm: 0.5
+
+logging:
+  save_freq_steps: 40960
+  checkpoint_dir: "./checkpoints/phase4"
+  log_dir: "./logs/phase4"
