@@ -65,7 +65,17 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco onnx onnxruntime pyyaml numpy
 ```
 
-### 2. Standalone Edge Deployment Simulation
+### 2. Interactive 3D Visual Disaster Simulation
+Launch the real-time 3D graphical simulation window to watch the robot navigate through a rubble disaster arena and adapt live when damage occurs:
+```bash
+# Watch the 3D simulation with live Front-Right limb amputation at step 150:
+py -3.14 visualize_3d.py --damage amputated_leg --leg fr
+
+# Watch with a locked peg leg on Rear-Left:
+py -3.14 visualize_3d.py --damage locked_joint --leg rl
+```
+
+### 3. Standalone Edge Deployment Simulation
 Run the production-ready ONNX or TorchScript policy simulating real hardware edge inference with dynamic limb damage:
 ```bash
 # Run ONNX controller with simulated front-right limb amputation at step 100
