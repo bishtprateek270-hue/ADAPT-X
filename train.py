@@ -45,14 +45,18 @@ def main():
     batch_size = num_envs * rollout_steps
     num_iterations = total_timesteps // batch_size
 
+    damage_enabled = config.get("damage_injection", {}).get("enabled", False)
+    phase_title = "PHASE 2: DAMAGE MODELING & FAULT TOLERANCE" if damage_enabled else "PHASE 1: BASELINE LOCOMOTION"
+
     print("=" * 70)
-    print("      ADAPT-X: SELF-HEALING QUADRUPED (PHASE 1 LOCOMOTION)")
+    print(f"      ADAPT-X: SELF-HEALING QUADRUPED ({phase_title})")
     print("=" * 70)
     print(f"Total Target Timesteps : {total_timesteps:,}")
     print(f"Parallel Environments  : {num_envs} (Laptop GPU Safe Mode)")
     print(f"Rollout Steps per Env  : {rollout_steps}")
     print(f"Batch Size per Iter    : {batch_size:,} transitions")
     print(f"Total PPO Iterations   : {num_iterations}")
+    print(f"Damage Injection Active: {damage_enabled}")
     print("=" * 70)
 
     # Instantiate Trainer

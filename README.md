@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.14-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2Bcu128-red.svg)
 ![MuJoCo](https://img.shields.io/badge/Physics-MuJoCo%203.17-orange.svg)
-![Status](https://img.shields.io/badge/Status-Phase%201%20Complete-green.svg)
+![Status](https://img.shields.io/badge/Status-Phase%202%20Active-green.svg)
 
 ---
 
@@ -31,10 +31,13 @@ When rovers, drones, or legged robots in remote environments (such as disaster z
   - [x] PPO Trainer & Model (`agents/ppo.py`)
   - [x] Laptop GPU (RTX 5050) Safe Execution Profile (< 25MB VRAM)
   - [x] Evaluation & Velocity Tracking Benchmark (`eval.py`)
-- [ ] **Phase 2: Failure Space & Damage Injection**
-  - [ ] Dead motor (zero torque / free swing)
-  - [ ] Locked joint (rigid peg mode)
-  - [ ] Dynamic limb fracture injection mid-episode
+- [x] **Phase 2: Failure Space & Damage Modeling**
+  - [x] Dead motor mode (zero torque / limp joint)
+  - [x] Locked joint mode (frozen angle / rigid peg leg)
+  - [x] Weakened actuator mode (25% torque output / thermal throttle)
+  - [x] Amputated limb mode (power cut to complete 3-joint leg)
+  - [x] Randomized mid-episode fault injector (`trigger_step_range: [150, 400]`)
+  - [x] Deterministic failure benchmarking CLI (`eval.py --damage ...`)
 - [ ] **Phase 3: Adaptive Policy Architecture (Self-Healing Intelligence)**
   - [ ] Temporal History Proprioceptive Encoder (RMA / Teacher-Student)
   - [ ] Latent Space morphological state estimation
@@ -51,23 +54,27 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco pyyaml numpy
 ```
 
-### 2. Verify Setup (Dry-Run)
+### 2. Training Phase 2: Fault-Tolerant Locomotion
+Train the policy under randomized dynamic mid-episode hardware failures:
 ```bash
-py -3.14 train.py --dry-run
+# Fine-tune with Phase 2 damage injection (from healthy Phase 1 checkpoint)
+py -3.14 train.py --config configs/phase2_damage_config.yaml --resume checkpoints/best_policy.pt
+
+# Or train Phase 2 from scratch (500k steps, ~15 mins on RTX 5050)
+py -3.14 train.py --config configs/phase2_damage_config.yaml
 ```
 
-### 3. Training Baseline Locomotion (Phase 1)
+### 3. Evaluating Failure Resilience
+Benchmark the robot against specific hardware damage:
 ```bash
-# Full training (500k steps, ~15 minutes on RTX 5050)
-py -3.14 train.py
+# Test dead motor on Front-Right leg at step 200
+py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage dead_motor --leg fr
 
-# Or custom steps
-py -3.14 train.py --steps 100000
-```
+# Test locked joint (frozen peg leg) on Rear-Left leg
+py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage locked_joint --leg rl
 
-### 4. Evaluate Trained Policy
-```bash
-py -3.14 eval.py --checkpoint checkpoints/best_policy.pt --episodes 5
+# Test full limb power loss
+py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage amputated_leg --leg fl
 ```
 
 ---

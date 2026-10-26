@@ -1,0 +1,67 @@
+# ADAPT-X: Phase 2 Dynamic Failure Injection & Damage Modeling Config
+# Optimized for RTX 5050 Laptop GPU (Safe Memory & Thermal Limits)
+
+system:
+  device: "cuda"                  # "cuda" or "cpu"
+  cuda_device_id: 0
+  max_vram_gb: 1.5                # Safe VRAM cap
+  num_cpu_threads: 4              # CPU threads limit to prevent system lag
+  seed: 42
+  headless: true                  # Fast headless training
+
+robot:
+  name: "adaptx_quadruped"
+  num_legs: 4
+  dof_per_leg: 3
+  total_dof: 12
+  action_scale: 0.4
+  kp: 25.0
+  kd: 0.8
+  torque_limit: 18.0
+
+environment:
+  dt: 0.02                        # 50 Hz control loop
+  sim_substeps: 10                # 500 Hz physics
+  episode_length_s: 20.0          # 1000 steps max
+  target_height: 0.28             # Desired torso height (m)
+  
+  command_ranges:
+    lin_vel_x: [0.4, 1.0]         # Positive forward marching drive
+    lin_vel_y: [-0.2, 0.2]
+    ang_vel_yaw: [-0.5, 0.5]
+
+# ================= PHASE 2: FAILURE SPACE MODELING =================
+damage_injection:
+  enabled: true                   # Enable randomized mid-episode damage injection
+  failure_prob: 0.6               # 60% of episodes experience sudden failure; 40% stay healthy
+  trigger_step_range: [150, 400]  # Damage occurs between step 150 (3s) and step 400 (8s)
+  failure_types:
+    - "dead_motor"                # Zero torque / limp joint
+    - "locked_joint"               # Frozen joint / rigid peg leg
+    - "weakened_motor"             # 25% torque output (overheating)
+    - "amputated_leg"              # Complete power loss to entire 3-joint leg
+  legs:
+    - "fr"                        # Front Right
+    - "fl"                        # Front Left
+    - "rr"                        # Rear Right
+    - "rl"                        # Rear Left
+
+ppo:
+  num_envs: 16                    # Safe parallel environments for laptop
+  rollout_steps: 256              # 4,096 transitions per rollout batch
+  total_timesteps: 500000         # ~15-18 mins total on RTX 5050
+  num_epochs: 4
+  num_minibatches: 4
+  lr: 0.00025                     # Slightly lower lr for stable adaptation
+  lr_decay: true
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  entropy_coef: 0.015             # Elevated entropy to explore non-traditional 3-leg gaits
+  value_coef: 0.5
+  max_grad_norm: 0.5
+
+logging:
+  save_freq_steps: 40960
+  checkpoint_dir: "./checkpoints/phase2"
+  log_dir: "./logs/phase2"

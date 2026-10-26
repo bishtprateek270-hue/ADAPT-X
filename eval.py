@@ -19,9 +19,13 @@ except Exception:
     MUJOCO_VIEWER_AVAILABLE = False
 
 
-def evaluate(checkpoint_path, config_path, num_episodes=5, render=False):
+def evaluate(checkpoint_path, config_path, num_episodes=5, render=False, damage="none", leg="fr", damage_step=200):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+
+    # Disable random auto-damage during deterministic eval
+    if "damage_injection" in config:
+        config["damage_injection"]["enabled"] = False
 
     env = QuadrupedEnv(config=config)
     obs_dim = env.observation_space.shape[0]
@@ -39,13 +43,18 @@ def evaluate(checkpoint_path, config_path, num_episodes=5, render=False):
 
     model.eval()
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 65)
     print(f"       ADAPT-X EVALUATION BENCHMARK ({num_episodes} Episodes)")
-    print("=" * 60)
+    if damage != "none":
+        print(f"  [DAMAGE INJECTED] Mode: {damage.upper()} on Leg: {leg.upper()} at Step {damage_step}")
+    else:
+        print("  [DAMAGE STATUS] None (Healthy 4-Leg Stance)")
+    print("=" * 65)
 
     ep_rewards = []
     ep_lengths = []
     vel_errors = []
+    post_damage_survivals = []
 
     for ep in range(1, num_episodes + 1):
         obs, _ = env.reset()
@@ -54,15 +63,19 @@ def evaluate(checkpoint_path, config_path, num_episodes=5, render=False):
         steps = 0
         recorded_vx = []
 
-        # Optional viewer setup
         viewer = None
         if render and MUJOCO_VIEWER_AVAILABLE and env.model is not None:
             viewer = mujoco.viewer.launch_passive(env.model, env.data)
 
         while not done:
+            # Inject damage at designated step
+            if damage != "none" and steps == damage_step:
+                env.inject_fault(damage, leg=leg)
+                if not render:
+                    print(f"  >>> Step {steps}: INJECTED FAILURE [{damage.upper()}] on {leg.upper()} leg!")
+
             obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
             with torch.no_grad():
-                # Use deterministic mean action for evaluation
                 action = model.actor_mean(obs_tensor).squeeze(0).cpu().numpy()
 
             obs, reward, terminated, truncated, info = env.step(action)
@@ -82,9 +95,12 @@ def evaluate(checkpoint_path, config_path, num_episodes=5, render=False):
         cmd_vx = env.commands[0]
         vel_err = abs(mean_vx - cmd_vx)
 
+        survived_post_damage = steps > damage_step if damage != "none" else True
+
         ep_rewards.append(total_reward)
         ep_lengths.append(steps)
         vel_errors.append(vel_err)
+        post_damage_survivals.append(survived_post_damage)
 
         print(
             f"Ep [{ep}/{num_episodes}] | "
@@ -92,22 +108,36 @@ def evaluate(checkpoint_path, config_path, num_episodes=5, render=False):
             f"Steps: {steps:>4d} | "
             f"Cmd Vx: {cmd_vx:.2f} m/s | "
             f"Actual Vx: {mean_vx:.2f} m/s | "
-            f"Vel Err: {vel_err:.2f} m/s"
+            f"Post-Damage Survived: {'YES' if survived_post_damage else 'NO (FELL)'}"
         )
 
-    print("-" * 60)
+    print("-" * 65)
     print(f"Mean Reward        : {np.mean(ep_rewards):.2f} +/- {np.std(ep_rewards):.2f}")
     print(f"Mean Survival Time : {np.mean(ep_lengths) * env.dt:.2f}s ({np.mean(ep_lengths):.0f} steps)")
     print(f"Mean Tracking Error: {np.mean(vel_errors):.3f} m/s")
-    print("=" * 60)
+    if damage != "none":
+        recovery_rate = np.mean(post_damage_survivals) * 100.0
+        print(f"Damage Survival Rate: {recovery_rate:.1f}%")
+    print("=" * 65)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Evaluate ADAPT-X Policy with or without Hardware Damage")
     parser.add_argument("--checkpoint", type=str, default="checkpoints/best_policy.pt")
     parser.add_argument("--config", type=str, default="configs/training_config.yaml")
     parser.add_argument("--episodes", type=int, default=5)
     parser.add_argument("--render", action="store_true")
+    parser.add_argument("--damage", type=str, default="none", choices=["none", "dead_motor", "locked_joint", "weakened_motor", "amputated_leg"])
+    parser.add_argument("--leg", type=str, default="fr", choices=["fr", "fl", "rr", "rl"])
+    parser.add_argument("--damage-step", type=int, default=200)
     args = parser.parse_args()
 
-    evaluate(args.checkpoint, args.config, args.episodes, args.render)
+    evaluate(
+        checkpoint_path=args.checkpoint,
+        config_path=args.config,
+        num_episodes=args.episodes,
+        render=args.render,
+        damage=args.damage,
+        leg=args.leg,
+        damage_step=args.damage_step
+    )
