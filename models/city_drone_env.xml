@@ -1,0 +1,269 @@
+<mujoco model="adaptx_self_healing_drone_city">
+  <compiler angle="radian" coordinate="local"/>
+  <option timestep="0.005" iterations="4" solver="Newton" gravity="0 0 -9.81"/>
+
+  <asset>
+    <!-- Vibrant Realistic Sky and City Lighting -->
+    <texture type="skybox" builtin="gradient" rgb1="0.35 0.60 0.90" rgb2="0.78 0.88 0.98" width="1024" height="1024"/>
+    
+    <!-- Ground & Road Textures and Materials -->
+    <texture name="grass_tex" type="2d" builtin="flat" rgb1="0.22 0.52 0.20" width="512" height="512"/>
+    <material name="grass_mat" texture="grass_tex" reflectance="0.05" specular="0.1"/>
+
+    <material name="road_mat" rgba="0.15 0.16 0.18 1.0" reflectance="0.12" specular="0.25"/>
+    <material name="sidewalk_mat" rgba="0.68 0.68 0.70 1.0" specular="0.15"/>
+    <material name="road_line_mat" rgba="0.95 0.95 0.95 1.0"/>
+    <material name="curb_mat" rgba="0.45 0.45 0.48 1.0"/>
+
+    <!-- Building Materials (Architectural Variety) -->
+    <material name="glass_tower_mat" rgba="0.22 0.46 0.68 0.92" specular="0.95" shininess="0.9" reflectance="0.45"/>
+    <material name="brick_building_mat" rgba="0.68 0.32 0.22 1.0" specular="0.1"/>
+    <material name="office_building_mat" rgba="0.78 0.80 0.83 1.0" specular="0.4"/>
+    <material name="modern_concrete_mat" rgba="0.88 0.88 0.90 1.0" specular="0.25"/>
+    <material name="roof_mat" rgba="0.22 0.24 0.28 1.0"/>
+    <material name="metal_spire_mat" rgba="0.85 0.85 0.90 1.0" specular="0.8"/>
+
+    <!-- Foliage / Tree Materials -->
+    <material name="tree_trunk_mat" rgba="0.40 0.25 0.14 1.0" specular="0.05"/>
+    <material name="tree_leaf_mat" rgba="0.18 0.62 0.22 1.0" specular="0.1"/>
+    <material name="tree_leaf_dark" rgba="0.12 0.48 0.16 1.0" specular="0.1"/>
+    <material name="tree_leaf_autumn" rgba="0.75 0.52 0.15 1.0" specular="0.1"/>
+
+    <!-- Street Furniture Materials -->
+    <material name="lamp_post_mat" rgba="0.25 0.26 0.28 1.0" specular="0.6"/>
+    <material name="lamp_light_mat" rgba="0.98 0.98 0.80 1.0" emission="0.8"/>
+
+    <!-- Drone Materials (Matte Carbon Fiber + Metallic Rotors) -->
+    <material name="drone_carbon_mat" rgba="0.09 0.10 0.12 1.0" specular="0.8" shininess="0.8"/>
+    <material name="drone_arm_mat" rgba="0.14 0.15 0.17 1.0" specular="0.5"/>
+    <material name="rotor_front_mat" rgba="0.95 0.20 0.15 0.80" specular="0.85"/>
+    <material name="rotor_rear_mat" rgba="0.20 0.22 0.26 0.80" specular="0.85"/>
+    <material name="motor_mat" rgba="0.82 0.84 0.88 1.0" specular="0.95"/>
+    <material name="camera_lens_mat" rgba="0.1 0.3 0.6 1.0" specular="0.95" reflectance="0.5"/>
+    <material name="led_green" rgba="0.1 0.98 0.2 1.0" emission="0.9"/>
+    <material name="led_red" rgba="0.98 0.1 0.1 1.0" emission="0.9"/>
+    <material name="led_blue" rgba="0.1 0.5 0.98 1.0" emission="0.9"/>
+  </asset>
+
+  <worldbody>
+    <!-- Sunlight and Ambient Lighting -->
+    <light directional="true" diffuse="0.95 0.95 0.90" specular="0.35 0.35 0.35" pos="10 -10 25" dir="-0.3 0.3 -1"/>
+    <light directional="false" diffuse="0.45 0.45 0.55" pos="0 0 15"/>
+
+    <!-- Overview Camera for Entire 3D City -->
+    <camera name="city_birds_eye" pos="-18 -18 16" xyaxes="0.707 -0.707 0 0.38 0.38 0.84"/>
+    <camera name="street_cam" pos="0 -14 2.0" xyaxes="1 0 0 0 0.15 0.98"/>
+
+    <!-- Ground: Park Lawns -->
+    <geom name="ground" type="plane" size="55 55 0.1" material="grass_mat"/>
+
+    <!-- Asphalt Road Network (Crossroads with 4 lanes) -->
+    <geom name="road_ns" type="plane" pos="0 0 0.001" size="4.0 50 0.01" material="road_mat"/>
+    <geom name="road_ew" type="plane" pos="0 0 0.002" size="50 4.0 0.01" material="road_mat"/>
+
+    <!-- Sidewalk Curbs -->
+    <geom name="curb_nw" type="box" pos="-8 8 0.06" size="4.0 4.0 0.06" material="sidewalk_mat"/>
+    <geom name="curb_ne" type="box" pos="8 8 0.06" size="4.0 4.0 0.06" material="sidewalk_mat"/>
+    <geom name="curb_sw" type="box" pos="-8 -8 0.06" size="4.0 4.0 0.06" material="sidewalk_mat"/>
+    <geom name="curb_se" type="box" pos="8 -8 0.06" size="4.0 4.0 0.06" material="sidewalk_mat"/>
+
+    <!-- Road Dividing Yellow & White Markings -->
+    <geom name="line_n1" type="box" pos="0 10 0.003" size="0.10 3.0 0.001" material="road_line_mat"/>
+    <geom name="line_n2" type="box" pos="0 20 0.003" size="0.10 3.0 0.001" material="road_line_mat"/>
+    <geom name="line_s1" type="box" pos="0 -10 0.003" size="0.10 3.0 0.001" material="road_line_mat"/>
+    <geom name="line_s2" type="box" pos="0 -20 0.003" size="0.10 3.0 0.001" material="road_line_mat"/>
+    <geom name="line_e1" type="box" pos="10 0 0.003" size="3.0 0.10 0.001" material="road_line_mat"/>
+    <geom name="line_e2" type="box" pos="20 0 0.003" size="3.0 0.10 0.001" material="road_line_mat"/>
+    <geom name="line_w1" type="box" pos="-10 0 0.003" size="3.0 0.10 0.001" material="road_line_mat"/>
+    <geom name="line_w2" type="box" pos="-20 0 0.003" size="3.0 0.10 0.001" material="road_line_mat"/>
+
+    <!-- Pedestrian Crosswalk Stripes (Zebra Crossing) -->
+    <geom name="zebra_n1" type="box" pos="-2.0 4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_n2" type="box" pos="-0.7 4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_n3" type="box" pos="0.7 4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_n4" type="box" pos="2.0 4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+
+    <geom name="zebra_s1" type="box" pos="-2.0 -4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_s2" type="box" pos="-0.7 -4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_s3" type="box" pos="0.7 -4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+    <geom name="zebra_s4" type="box" pos="2.0 -4.8 0.003" size="0.35 0.5 0.001" material="road_line_mat"/>
+
+    <!-- ================= 3D CITY BUILDINGS & TOWERS ================= -->
+    <!-- Tower 1: Blue Glass Mirror Skyscraper (North-East) -->
+    <body name="tower_ne" pos="10 10 6.0">
+      <geom type="box" size="3.2 3.2 6.0" material="glass_tower_mat"/>
+      <geom type="box" pos="0 0 6.1" size="3.0 3.0 0.1" material="roof_mat"/>
+      <geom type="cylinder" pos="0 0 7.2" size="0.08 1.1" material="metal_spire_mat"/>
+    </body>
+
+    <!-- Tower 2: Heritage Red Brick Commercial Tower (North-West) -->
+    <body name="tower_nw" pos="-10 10 7.5">
+      <geom type="box" size="3.0 3.5 7.5" material="brick_building_mat"/>
+      <geom type="box" pos="0 0 7.6" size="2.8 3.3 0.1" material="roof_mat"/>
+      <geom type="cylinder" pos="1.0 1.0 8.6" size="0.06 1.0" material="metal_spire_mat"/>
+    </body>
+
+    <!-- Tower 3: Contemporary Corporate Headquarters (South-West) -->
+    <body name="tower_sw" pos="-10 -10 5.0">
+      <geom type="box" size="3.6 2.8 5.0" material="office_building_mat"/>
+      <geom type="box" pos="0 0 5.1" size="3.4 2.6 0.1" material="roof_mat"/>
+      <geom type="box" pos="0 0 5.6" size="1.5 1.5 0.4" material="modern_concrete_mat"/>
+    </body>
+
+    <!-- Tower 4: Modern High-Rise Residential Tower (South-East) -->
+    <body name="tower_se" pos="10 -10 8.5">
+      <geom type="box" size="2.8 2.8 8.5" material="modern_concrete_mat"/>
+      <geom type="box" pos="0 0 8.6" size="2.6 2.6 0.1" material="roof_mat"/>
+      <geom type="cylinder" pos="0 0 9.8" size="0.10 1.2" material="metal_spire_mat"/>
+    </body>
+
+    <!-- Distant City Skyline Skyscrapers -->
+    <geom type="box" pos="0 26 10.0" size="8.0 4.0 10.0" material="glass_tower_mat"/>
+    <geom type="box" pos="0 -26 11.0" size="7.0 4.0 11.0" material="office_building_mat"/>
+    <geom type="box" pos="26 0 9.0" size="4.0 8.0 9.0" material="brick_building_mat"/>
+    <geom type="box" pos="-26 0 10.5" size="4.0 7.0 10.5" material="glass_tower_mat"/>
+
+    <!-- ================= STREET LAMPS ================= -->
+    <body name="lamp_1" pos="4.6 4.6 0">
+      <geom type="cylinder" pos="0 0 1.8" size="0.04 1.8" material="lamp_post_mat"/>
+      <geom type="sphere" pos="-0.2 0 3.6" size="0.15" material="lamp_light_mat"/>
+    </body>
+    <body name="lamp_2" pos="-4.6 4.6 0">
+      <geom type="cylinder" pos="0 0 1.8" size="0.04 1.8" material="lamp_post_mat"/>
+      <geom type="sphere" pos="0.2 0 3.6" size="0.15" material="lamp_light_mat"/>
+    </body>
+    <body name="lamp_3" pos="4.6 -4.6 0">
+      <geom type="cylinder" pos="0 0 1.8" size="0.04 1.8" material="lamp_post_mat"/>
+      <geom type="sphere" pos="-0.2 0 3.6" size="0.15" material="lamp_light_mat"/>
+    </body>
+    <body name="lamp_4" pos="-4.6 -4.6 0">
+      <geom type="cylinder" pos="0 0 1.8" size="0.04 1.8" material="lamp_post_mat"/>
+      <geom type="sphere" pos="0.2 0 3.6" size="0.15" material="lamp_light_mat"/>
+    </body>
+
+    <!-- ================= 3D TREES & FOLIAGE ================= -->
+    <!-- Lush Avenue Trees -->
+    <body name="tree_1" pos="5.2 6.5 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.5" size="1.0" material="tree_leaf_mat"/>
+      <geom type="sphere" pos="0 0 3.2" size="0.75" material="tree_leaf_dark"/>
+    </body>
+
+    <body name="tree_2" pos="-5.2 6.5 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.5" size="1.0" material="tree_leaf_dark"/>
+      <geom type="sphere" pos="0 0 3.3" size="0.75" material="tree_leaf_mat"/>
+    </body>
+
+    <body name="tree_3" pos="5.2 -6.5 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.5" size="1.0" material="tree_leaf_mat"/>
+      <geom type="sphere" pos="0 0 3.2" size="0.75" material="tree_leaf_dark"/>
+    </body>
+
+    <body name="tree_4" pos="-5.2 -6.5 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.5" size="1.0" material="tree_leaf_autumn"/>
+      <geom type="sphere" pos="0 0 3.3" size="0.80" material="tree_leaf_dark"/>
+    </body>
+
+    <!-- Extended Street Trees -->
+    <body name="tree_5" pos="5.2 14.0 0">
+      <geom type="cylinder" pos="0 0 1.2" size="0.15 1.2" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.8" size="1.1" material="tree_leaf_mat"/>
+    </body>
+
+    <body name="tree_6" pos="-5.2 14.0 0">
+      <geom type="cylinder" pos="0 0 1.2" size="0.15 1.2" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.8" size="1.1" material="tree_leaf_dark"/>
+    </body>
+
+    <body name="tree_7" pos="14.0 5.2 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.6" size="1.0" material="tree_leaf_mat"/>
+    </body>
+
+    <body name="tree_8" pos="-14.0 5.2 0">
+      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
+      <geom type="sphere" pos="0 0 2.6" size="1.0" material="tree_leaf_dark"/>
+    </body>
+
+    <!-- ================= THE SELF-HEALING QUADCOPTER DRONE ================= -->
+    <!-- Spawned in Mid-Air Flying at Z = 4.0 meters above the crossroad -->
+    <body name="drone" pos="0.0 0.0 4.0">
+      <freejoint name="drone_root"/>
+
+      <!-- Built-in Cameras Following Drone -->
+      <camera name="drone_chase" pos="-1.3 0 0.5" xyaxes="0 -1 0 0.35 0 0.93"/>
+      <camera name="drone_fpv" pos="0.14 0 0.02" xyaxes="0 -1 0 0 0 1"/>
+      <camera name="drone_top" pos="0 0 2.0" xyaxes="1 0 0 0 1 0"/>
+      
+      <!-- Central Aerodynamic Carbon-Fiber Fuselage -->
+      <geom name="fuselage" type="box" size="0.12 0.09 0.035" mass="0.60" material="drone_carbon_mat"/>
+      <geom name="top_canopy" type="ellipsoid" pos="0 0 0.03" size="0.10 0.07 0.02" mass="0.08" material="drone_carbon_mat"/>
+      
+      <!-- FPV Front Camera Dome Gimbal -->
+      <geom name="gimbal_base" type="sphere" pos="0.11 0 -0.01" size="0.025" mass="0.04" material="drone_carbon_mat"/>
+      <geom name="camera_lens" type="sphere" pos="0.125 0 -0.01" size="0.014" mass="0.01" material="camera_lens_mat"/>
+
+      <!-- Status Indicator LEDs -->
+      <geom name="led_f" type="sphere" pos="0.11 0 0.015" size="0.015" material="led_green"/>
+      <geom name="led_r" type="sphere" pos="-0.11 0 0.015" size="0.015" material="led_red"/>
+      <geom name="led_side" type="sphere" pos="0 0 0.045" size="0.012" material="led_blue"/>
+
+      <!-- Landing Struts / Skids -->
+      <geom name="skid_left" type="capsule" fromto="0.10 0.08 -0.06 -0.10 0.08 -0.06" size="0.008" mass="0.04" material="drone_arm_mat"/>
+      <geom name="skid_right" type="capsule" fromto="0.10 -0.08 -0.06 -0.10 -0.08 -0.06" size="0.008" mass="0.04" material="drone_arm_mat"/>
+      <geom name="leg_fl" type="capsule" fromto="0.07 0.06 -0.01 0.08 0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
+      <geom name="leg_fr" type="capsule" fromto="0.07 -0.06 -0.01 0.08 -0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
+      <geom name="leg_rl" type="capsule" fromto="-0.07 0.06 -0.01 -0.08 0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
+      <geom name="leg_rr" type="capsule" fromto="-0.07 -0.06 -0.01 -0.08 -0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
+
+      <!-- Cross Carbon Fiber Rotor Arms -->
+      <!-- Arm 1: Front-Right (+X, -Y) -->
+      <geom name="arm_fr" type="capsule" fromto="0 0 0 0.18 -0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
+      <geom name="motor_fr" type="cylinder" pos="0.18 -0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
+      <!-- Rotor 1 Propeller Blade (Red = Front) -->
+      <geom name="prop_fr" type="cylinder" pos="0.18 -0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_front_mat"/>
+      <site name="thrust_site_fr" pos="0.18 -0.18 0.045"/>
+
+      <!-- Arm 2: Front-Left (+X, +Y) -->
+      <geom name="arm_fl" type="capsule" fromto="0 0 0 0.18 0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
+      <geom name="motor_fl" type="cylinder" pos="0.18 0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
+      <!-- Rotor 2 Propeller Blade (Red = Front) -->
+      <geom name="prop_fl" type="cylinder" pos="0.18 0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_front_mat"/>
+      <site name="thrust_site_fl" pos="0.18 0.18 0.045"/>
+
+      <!-- Arm 3: Rear-Right (-X, -Y) -->
+      <geom name="arm_rr" type="capsule" fromto="0 0 0 -0.18 -0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
+      <geom name="motor_rr" type="cylinder" pos="-0.18 -0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
+      <!-- Rotor 3 Propeller Blade (Dark Grey = Rear) -->
+      <geom name="prop_rr" type="cylinder" pos="-0.18 -0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_rear_mat"/>
+      <site name="thrust_site_rr" pos="-0.18 -0.18 0.045"/>
+
+      <!-- Arm 4: Rear-Left (-X, +Y) -->
+      <geom name="arm_rl" type="capsule" fromto="0 0 0 -0.18 0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
+      <geom name="motor_rl" type="cylinder" pos="-0.18 0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
+      <!-- Rotor 4 Propeller Blade (Dark Grey = Rear) -->
+      <geom name="prop_rl" type="cylinder" pos="-0.18 0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_rear_mat"/>
+      <site name="thrust_site_rl" pos="-0.18 0.18 0.045"/>
+
+      <site name="drone_imu" pos="0 0 0"/>
+    </body>
+  </worldbody>
+
+  <!-- 4 Upward Vertical Thrusters for the Quadcopter Drone -->
+  <actuator>
+    <!-- Thrust forces in Newtons [0 to 8 N per rotor] -->
+    <!-- Hover requires ~13.5 N total = 3.38 N per rotor (total drone mass ~1.37 kg) -->
+    <general name="thrust_fr" site="thrust_site_fr" gear="0 0 1 0 0 -0.02" ctrlrange="0 12" ctrllimited="true"/>
+    <general name="thrust_fl" site="thrust_site_fl" gear="0 0 1 0 0 0.02" ctrlrange="0 12" ctrllimited="true"/>
+    <general name="thrust_rr" site="thrust_site_rr" gear="0 0 1 0 0 0.02" ctrlrange="0 12" ctrllimited="true"/>
+    <general name="thrust_rl" site="thrust_site_rl" gear="0 0 1 0 0 -0.02" ctrlrange="0 12" ctrllimited="true"/>
+  </actuator>
+
+  <sensor>
+    <gyro name="gyro" site="drone_imu"/>
+    <accelerometer name="accel" site="drone_imu"/>
+  </sensor>
+</mujoco>

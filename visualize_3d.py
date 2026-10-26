@@ -98,16 +98,25 @@ def launch_3d_disaster_simulation(checkpoint_path="checkpoints/phase3/best_polic
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Launch 3D Visual Disaster Simulation Window")
+    parser = argparse.ArgumentParser(description="Launch ADAPT-X 3D Visual Simulation Window")
+    parser.add_argument("--drone", action="store_true", help="Launch 3D City Drone Flight Simulation instead of Quadruped")
     parser.add_argument("--checkpoint", type=str, default="checkpoints/phase3/best_policy.pt")
-    parser.add_argument("--damage", type=str, default="amputated_leg", choices=["none", "dead_motor", "locked_joint", "weakened_motor", "amputated_leg"])
+    parser.add_argument("--damage", type=str, default="amputated_leg")
     parser.add_argument("--leg", type=str, default="fr", choices=["fr", "fl", "rr", "rl"])
     parser.add_argument("--damage-step", type=int, default=150)
     args = parser.parse_args()
 
-    launch_3d_disaster_simulation(
-        checkpoint_path=args.checkpoint,
-        damage=args.damage,
-        leg=args.leg,
-        damage_step=args.damage_step
-    )
+    if args.drone:
+        from fly_drone import run_drone_simulation
+        # Map leg to rotor if specified
+        rotor = args.leg if args.leg in ["fr", "fl", "rr", "rl"] else "fr"
+        drone_damage = "dead_motor" if args.damage != "none" else "none"
+        run_drone_simulation(mode="cruise", damage=drone_damage, rotor=rotor, damage_step=args.damage_step)
+    else:
+        launch_3d_disaster_simulation(
+            checkpoint_path=args.checkpoint,
+            damage=args.damage,
+            leg=args.leg,
+            damage_step=args.damage_step
+        )
+

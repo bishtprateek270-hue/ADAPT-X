@@ -65,8 +65,23 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco onnx onnxruntime pyyaml numpy
 ```
 
-### 2. Interactive 3D Visual Disaster Simulation
-Launch the real-time 3D graphical simulation window to watch the robot navigate through a rubble disaster arena and adapt live when damage occurs:
+### 2. Interactive 3D Visual Simulations
+
+#### A. 3D City Drone Flight Simulator (Urban Environment with Skyscrapers & Trees)
+Watch the quadcopter UAV navigate through a vibrant 3D city environment featuring high-rise glass skyscrapers, tree-lined avenues, crosswalks, and street lamps, while dynamically recovering from mid-air rotor loss:
+```bash
+# Launch interactive 3D city flight with mid-air Front-Right rotor failure at step 150:
+py -3.14 fly_drone.py --damage dead_motor --rotor fr
+
+# Fly in orbit mode around the city center:
+py -3.14 fly_drone.py --mode orbit --damage none
+
+# You can also launch from the unified 3D visualizer:
+py -3.14 visualize_3d.py --drone
+```
+
+#### B. 3D Quadruped Disaster Arena Simulation
+Watch the 12-DoF quadruped robot traverse a post-disaster obstacle course and adapt its gait live when limbs are amputated or motors seize:
 ```bash
 # Watch the 3D simulation with live Front-Right limb amputation at step 150:
 py -3.14 visualize_3d.py --damage amputated_leg --leg fr
