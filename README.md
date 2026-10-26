@@ -65,6 +65,21 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco onnx onnxruntime pyyaml numpy
 ```
 
+---
+
+### ⚡ NVIDIA DGX & Isaac Lab High-Performance Training
+To train at enterprise scale on **NVIDIA DGX (A100/H100/SuperPOD)** or **NVIDIA Isaac Lab**:
+```bash
+# 1-Click DGX Launcher (128 parallel environments, 40,000+ FPS):
+./run_dgx.sh
+
+# Or train 4,096 parallel robots on GPU in NVIDIA Isaac Lab / Omniverse:
+./isaaclab.sh -p isaac_lab/train_isaac_lab.py --num_envs 4096 --robot drone
+```
+*Full cluster instructions available in [DGX_TRAINING_GUIDE.md](file:///c:/Users/Bisht/OneDrive/Desktop/ADAPT-X/DGX_TRAINING_GUIDE.md).*
+
+---
+
 ### 2. Interactive 3D Visual Simulations
 
 #### A. 3D City Drone Flight Simulator (Urban Environment with Skyscrapers & Trees)
