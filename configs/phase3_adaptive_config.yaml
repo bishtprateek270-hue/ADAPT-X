@@ -1,0 +1,73 @@
+# ADAPT-X: Phase 3 Adaptive Architecture Config (Self-Healing Brain)
+# Temporal History Encoder + Latent Adaptive Policy (RMA Paradigm)
+# Optimized for RTX 5050 Laptop GPU (Safe Memory & Thermal Caps)
+
+system:
+  device: "cuda"                  # "cuda" or "cpu"
+  cuda_device_id: 0
+  max_vram_gb: 1.5                # Safe VRAM cap
+  num_cpu_threads: 4              # Cap CPU threads to prevent UI lockup
+  seed: 42
+  headless: true                  # Fast headless training
+
+robot:
+  name: "adaptx_quadruped"
+  num_legs: 4
+  dof_per_leg: 3
+  total_dof: 12
+  action_scale: 0.4
+  kp: 25.0
+  kd: 0.8
+  torque_limit: 18.0
+
+environment:
+  dt: 0.02                        # 50 Hz control loop
+  sim_substeps: 10                # 500 Hz physics
+  episode_length_s: 20.0          # 1000 steps max
+  target_height: 0.28             # Desired torso height (m)
+  
+  command_ranges:
+    lin_vel_x: [0.3, 0.8]         # Target forward walking velocities
+    lin_vel_y: [-0.15, 0.15]
+    ang_vel_yaw: [-0.4, 0.4]
+
+# ================= PHASE 3: ADAPTIVE TEMPORAL HISTORY =================
+adaptive:
+  history_len: 20                 # Last 20 timesteps = 0.4s temporal history window
+  latent_dim: 16                  # Latent space dimension representing hardware state z_t
+
+# ================= PHASE 2/3: FAILURE SPACE INJECTION =================
+damage_injection:
+  enabled: true                   # Enable dynamic mid-stride damage injection
+  failure_prob: 0.7               # 70% damaged episodes; 30% healthy baseline
+  trigger_step_range: [150, 400]  # Failure occurs between 3s and 8s
+  failure_types:
+    - "dead_motor"                # Zero torque / limp joint
+    - "locked_joint"               # Frozen joint / rigid peg
+    - "weakened_motor"             # 25% torque output (overheating)
+    - "amputated_leg"              # Complete power cut to 3-joint leg
+  legs:
+    - "fr"
+    - "fl"
+    - "rr"
+    - "rl"
+
+ppo:
+  num_envs: 16                    # Safe parallel environments for laptop
+  rollout_steps: 256              # 4,096 transitions per rollout batch
+  total_timesteps: 500000         # ~12-15 mins on RTX 5050
+  num_epochs: 4
+  num_minibatches: 4
+  lr: 0.00025
+  lr_decay: true
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  entropy_coef: 0.012             # Moderate entropy to encourage stable 3-leg limping
+  value_coef: 0.5
+  max_grad_norm: 0.5
+
+logging:
+  save_freq_steps: 40960
+  checkpoint_dir: "./checkpoints/phase3"
+  log_dir: "./logs/phase3"

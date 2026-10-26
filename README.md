@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/Python-3.14-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2Bcu128-red.svg)
 ![MuJoCo](https://img.shields.io/badge/Physics-MuJoCo%203.17-orange.svg)
-![Status](https://img.shields.io/badge/Status-Phase%202%20Active-green.svg)
+![Status](https://img.shields.io/badge/Status-Phase%203%20Adaptive%20Ready-green.svg)
 
 ---
 
@@ -18,8 +18,9 @@ When rovers, drones, or legged robots in remote environments (such as disaster z
 ## 🛠️ Architecture & Tech Stack
 * **Physics Simulator:** MuJoCo 3.17 (High-fidelity contact dynamics at 500 Hz).
 * **Environment Interface:** Gymnasium (Custom 12-DoF Quadruped MDP).
-* **RL Framework:** PyTorch PPO (Proximal Policy Optimization) with Generalized Advantage Estimation (GAE).
-* **Policy Architecture:** Compact Actor-Critic MLP (`[48 -> 256 -> 128 -> 12]`) designed for microsecond inference and hardware safety.
+* **RL Framework:** PyTorch PPO with Generalized Advantage Estimation (GAE).
+* **Self-Healing Brain (RMA Paradigm):** Temporal History Encoder ($H = 20$ timesteps $\approx 0.4\text{s}$) compressing proprioception ($840\text{ dims}$) into a latent morphological state $\mathbf{z}_t \in \mathbb{R}^{16}$.
+* **Adaptive Policy:** $\pi_\theta(a_t \mid s_t, \mathbf{z}_t)$ instantly re-conditions its control outputs when $\mathbf{z}_t$ shifts under damage.
 * **Control Loop:** 50 Hz policy frequency with low-level PD position control ($K_p = 25.0, K_d = 0.8$).
 
 ---
@@ -37,10 +38,12 @@ When rovers, drones, or legged robots in remote environments (such as disaster z
   - [x] Weakened actuator mode (25% torque output / thermal throttle)
   - [x] Amputated limb mode (power cut to complete 3-joint leg)
   - [x] Randomized mid-episode fault injector (`trigger_step_range: [150, 400]`)
-  - [x] Deterministic failure benchmarking CLI (`eval.py --damage ...`)
-- [ ] **Phase 3: Adaptive Policy Architecture (Self-Healing Intelligence)**
-  - [ ] Temporal History Proprioceptive Encoder (RMA / Teacher-Student)
-  - [ ] Latent Space morphological state estimation
+  - [x] 100% Damage Survival Rate achieved on Phase 2 evaluation benchmark
+- [x] **Phase 3: Adaptive Policy Architecture (Self-Healing Intelligence)**
+  - [x] Proprioceptive History Buffer ($20 \text{ steps} \times 42 \text{ dims} = 840 \text{ dims}$)
+  - [x] Temporal Latent Encoder (`agents/adaptive_ppo.py`) producing $\mathbf{z}_t \in \mathbb{R}^{16}$
+  - [x] Adaptive Policy Network $\pi(a_t \mid s_t, \mathbf{z}_t)$
+  - [x] Latent shift monitoring CLI (`eval_adaptive.py`) measuring $||\Delta \mathbf{z}||$
 - [ ] **Phase 4: Curriculum Learning & 3-Legged Recovery Benchmark**
 - [ ] **Phase 5: Sim-to-Real Readiness & Model Export (ONNX)**
 
@@ -54,29 +57,22 @@ Ensure Python and required packages are installed:
 pip install torch gymnasium mujoco pyyaml numpy
 ```
 
-### 2. Training Phase 2: Fault-Tolerant Locomotion
-Train the policy under randomized dynamic mid-episode hardware failures:
+### 2. Training Phase 3: Adaptive Self-Healing Policy
+Train the policy with the temporal history encoder under randomized mid-stride damage:
 ```bash
-# Fine-tune with Phase 2 damage injection (from healthy Phase 1 checkpoint)
-py -3.14 train.py --config configs/phase2_damage_config.yaml --resume checkpoints/best_policy.pt
-
-# Or train Phase 2 from scratch (500k steps, ~15 mins on RTX 5050)
-py -3.14 train.py --config configs/phase2_damage_config.yaml
+# Full Phase 3 training (500k steps, ~12-15 mins on RTX 5050, <40MB VRAM)
+py -3.14 train_adaptive.py --config configs/phase3_adaptive_config.yaml
 ```
 
-### 3. Evaluating Failure Resilience
-Benchmark the robot against specific hardware damage:
+### 3. Evaluating Adaptive Gait Recalculation
+Benchmark the adaptive policy and monitor real-time neural state adaptation $||\Delta \mathbf{z}||$:
 ```bash
-# Test dead motor on Front-Right leg at step 200
-py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage dead_motor --leg fr
+# Test adaptation to an amputated Front-Right limb at step 200
+py -3.14 eval_adaptive.py --checkpoint checkpoints/phase3/best_policy.pt --damage amputated_leg --leg fr
 
-# Test locked joint (frozen peg leg) on Rear-Left leg
-py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage locked_joint --leg rl
-
-# Test full limb power loss
-py -3.14 eval.py --checkpoint checkpoints/phase2/best_policy.pt --damage amputated_leg --leg fl
+# Test adaptation to a frozen Rear-Left locked joint
+py -3.14 eval_adaptive.py --checkpoint checkpoints/phase3/best_policy.pt --damage locked_joint --leg rl
 ```
-
 ---
 
 ## 📊 State & Action Space

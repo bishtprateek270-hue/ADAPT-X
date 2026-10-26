@@ -96,6 +96,14 @@ class QuadrupedEnv(gym.Env):
         self.fault_trigger_step = -1
         self.locked_angles = {}
 
+        # Phase 3: Adaptive Proprioceptive History (RMA)
+        adaptive_cfg = self.config.get("adaptive", {})
+        self.history_len = int(adaptive_cfg.get("history_len", 20))
+        # Proprioceptive slice: joint_pos_rel(12) + joint_vel(12) + prev_action(12) + base_ang_vel(3) + proj_gravity(3) = 42
+        self.single_proprio_dim = 42
+        self.history_dim = self.history_len * self.single_proprio_dim
+        self.history_buf = np.zeros((self.history_len, self.single_proprio_dim), dtype=np.float32)
+
         self.viewer = None
 
     def inject_fault(self, fault_type, leg="fr", joint_subidx=None):
@@ -332,6 +340,36 @@ class QuadrupedEnv(gym.Env):
             return True
 
         return False
+
+    def _get_single_proprio(self):
+        if self.model is None or self.data is None:
+            return np.zeros(self.single_proprio_dim, dtype=np.float32)
+        quat = self.data.qpos[3:7]
+        w, x, y, z = quat
+        gx = 2.0 * (x * z - w * y)
+        gy = 2.0 * (y * z + w * x)
+        gz = 1.0 - 2.0 * (x * x + y * y)
+        proj_g = np.array([-gx, -gy, -gz], dtype=np.float32)
+        ang_vel = np.array(self.data.qvel[3:6], dtype=np.float32)
+        joint_pos_rel = (self.data.qpos[7:19] - self.default_joint_pos).astype(np.float32)
+        joint_vel = self.data.qvel[6:18].astype(np.float32)
+        return np.concatenate([
+            joint_pos_rel, joint_vel, self.prev_action, ang_vel, proj_g
+        ]).astype(np.float32)
+
+    def reset_adaptive(self, seed=None, options=None):
+        obs, info = self.reset(seed=seed, options=options)
+        p0 = self._get_single_proprio()
+        for i in range(self.history_len):
+            self.history_buf[i] = p0
+        return obs, self.history_buf.flatten().copy(), info
+
+    def step_adaptive(self, action):
+        obs, reward, terminated, truncated, info = self.step(action)
+        p = self._get_single_proprio()
+        self.history_buf[:-1] = self.history_buf[1:]
+        self.history_buf[-1] = p
+        return obs, self.history_buf.flatten().copy(), reward, terminated, truncated, info
 
     def close(self):
         if self.viewer is not None:
