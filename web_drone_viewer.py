@@ -6,13 +6,9 @@ to any browser (Chrome, Edge, Firefox, Safari) on your laptop, phone, or tablet.
 
 import os
 import sys
-import time
-import json
-import io
-import threading
-from urllib.parse import urlparse, parse_qs
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import ThreadingMixIn
+
+# Force headless hardware-accelerated NVIDIA EGL rendering (eliminates GLX X11 static noise)
+os.environ["MUJOCO_GL"] = "egl"
 
 # Auto-switch to virtual environment if needed
 venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python")
@@ -21,6 +17,14 @@ if os.path.exists(venv_python) and sys.executable != venv_python:
         import mujoco
     except ImportError:
         os.execv(venv_python, [venv_python] + sys.argv)
+
+import time
+import json
+import io
+import threading
+from urllib.parse import urlparse, parse_qs
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 import numpy as np
 from PIL import Image
@@ -38,7 +42,7 @@ class SimulationWorker:
 
         self.width = 960
         self.height = 540
-        self.renderer = mujoco.Renderer(self.env.model, height=self.height, width=self.width)
+        self.renderer = None
 
         self.camera = mujoco.MjvCamera()
         self.drone_id = mujoco.mj_name2id(self.env.model, mujoco.mjtObj.mjOBJ_BODY, "drone")
@@ -77,20 +81,20 @@ class SimulationWorker:
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
             self.camera.distance = 2.4
-            self.camera.elevation = -14.0
+            self.camera.elevation = -12.0
             self.camera.azimuth = 90.0
         elif self.camera_mode == "fpv":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 0.7
-            self.camera.elevation = -5.0
+            self.camera.distance = 0.5
+            self.camera.elevation = -4.0
             self.camera.azimuth = 0.0
         elif self.camera_mode == "orbit":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 3.8
-            self.camera.elevation = -25.0
-            self.camera.azimuth = (self.step_count * 0.4) % 360.0
+            self.camera.distance = 3.6
+            self.camera.elevation = -18.0
+            self.camera.azimuth = (self.step_count * 0.5) % 360.0
         elif self.camera_mode == "top":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
@@ -116,6 +120,8 @@ class SimulationWorker:
             self.flight_mode = mode
 
     def run_loop(self):
+        # Create EGL hardware accelerated renderer inside worker thread
+        self.renderer = mujoco.Renderer(self.env.model, height=self.height, width=self.width)
         last_time = time.perf_counter()
         fps_counter = 0
         fps_timer = time.perf_counter()
@@ -645,6 +651,7 @@ setInterval(async () => {
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
+    allow_reuse_address = True
 
 
 class StreamingHandler(BaseHTTPRequestHandler):

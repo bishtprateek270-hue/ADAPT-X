@@ -19,4 +19,8 @@ echo "======================================================================"
 echo " Open your browser now to: http://${HOST_IP}:$PORT"
 echo "======================================================================"
 
+export MUJOCO_GL=egl
+fuser -k "${PORT}/tcp" 2>/dev/null || true
+sleep 0.5
+
 exec /home/piet/ADAPT-X/.venv/bin/python /home/piet/ADAPT-X/web_drone_viewer.py --port "$PORT" --host 0.0.0.0
