@@ -28,31 +28,50 @@ cd ADAPT-X
 
 ### Step 2: Choose Your Training Engine on DGX
 
-#### 🟢 Option A: Vectorized DGX Trainer (Recommended, Zero Setup Overhead)
-Scales training across **64 to 256 parallel environments** on DGX CPU cores and GPU tensor stream:
+#### 🟢 Option A: DGX Spark Heavy Deep RL Phased Trainer (3.3M Parameter Model)
+Utilizes **Multi-Head Temporal Transformer** + **512-wide Deep ResNet Actor-Critic** with **BFloat16 Tensor Core** acceleration:
 ```bash
-# Make script executable
-chmod +x run_dgx.sh
+# 1-Click launcher for heavy model training across all 5 phases:
+./run_heavy_dgx_spark.sh all 1.0 32
 
-# Run 1-click DGX launcher (128 parallel envs, 1,000,000 timesteps):
-./run_dgx.sh
-
-# Or run directly with custom parameters:
-python3 train_dgx.py --env drone --num-envs 128 --timesteps 1000000 --device 0
+# Or run with custom scale and parallel workers:
+./run_heavy_dgx_spark.sh all 0.5 64
 ```
-* **Performance:** **$\sim 20,000 - 45,000\text{ FPS}$** (Completes 1 Million steps in **$\sim 45 - 90\text{ seconds}$**).
-* **Output:** Saves trained weights to `checkpoints/dgx_drone_best_policy.pt`.
+* **Architecture:** 4-Head Temporal Transformer ($H=20 \rightarrow \mathbf{z}_t \in \mathbb{R}^{32}$) + Deep ResNet Actor & Critic Trunks (3,304,377 parameters).
+* **Performance:** $\sim 2,500\text{ FPS}$ on Blackwell GB10 Tensor Cores with sub-millisecond edge ONNX runtime ($645\ \mu\text{s}$ P50).
+* **Output:** Checkpoints in `checkpoints/dgx_spark_heavy/` and deployment models in `deployments/adaptx_heavy_dgx_spark.onnx`.
 
 ---
 
-#### 🟣 Option B: NVIDIA Isaac Lab / Isaac Sim (Omniverse GPU Tensors)
-If your DGX cluster has **NVIDIA Omniverse / Isaac Lab** installed:
+#### 🟢 Option B: DGX Spark Fast Phased Curriculum Trainer
+Divided into 5 distinct training curriculum phases with automatic checkpoint chaining:
 ```bash
-# Run with Isaac Lab's Python launcher (4,096 parallel GPU actors):
-./isaaclab.sh -p isaac_lab/train_isaac_lab.py --num_envs 4096 --robot drone --device cuda:0
+# 1-Click launcher for all 5 phases on DGX Spark:
+./run_dgx_spark_phases.sh quadruped all
+
+# Or run a specific phase individually:
+./run_dgx_spark_phases.sh quadruped 1   # Phase 1: Nominal Locomotion
+./run_dgx_spark_phases.sh quadruped 2   # Phase 2: Damage Injection
+./run_dgx_spark_phases.sh quadruped 3   # Phase 3: RMA History Encoder
+./run_dgx_spark_phases.sh quadruped 4   # Phase 4: Staged Disturbance Curriculum
+./run_dgx_spark_phases.sh quadruped 5   # Phase 5: Sim2Real & ONNX Export
 ```
-* **Performance:** **$\sim 45,000+\text{ FPS}$** utilizing NVIDIA PhysX 5 GPU tensor streams.
-* **Output:** Exports directly to `deployments/adaptx_isaac_policy.onnx`.
+* **Performance:** **$\sim 4,000 - 15,000\text{ FPS}$** on NVIDIA Grace Blackwell GB10.
+* **Output:** Checkpoints saved to `checkpoints/dgx_spark/` and ONNX policy exported to `deployments/adaptx_dgx_spark_policy.onnx`.
+
+---
+
+#### 🟣 Option B: NVIDIA Isaac Lab & Isaac Sim Phased RL Suite
+If your cluster runs **NVIDIA Omniverse / Isaac Sim & Isaac Lab**:
+```bash
+# Launch with Isaac Lab launcher script:
+./isaac_lab/isaac_lab_phases.sh quadruped all 4096
+
+# Or run directly with Isaac Lab Python wrapper:
+./isaaclab.sh -p isaac_lab/train_isaac_lab_phases.py --phase all --robot quadruped --num_envs 4096
+```
+* **Performance:** **$\sim 45,000+\text{ FPS}$** using NVIDIA PhysX 5 GPU Tensor Streams.
+* **Output:** Direct export to `deployments/adaptx_isaac_policy.onnx`.
 
 ---
 

@@ -12,6 +12,14 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Auto-switch to project virtual environment if running in unconfigured interpreter
+venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python")
+if os.path.exists(venv_python) and sys.executable != venv_python:
+    try:
+        import gymnasium
+    except ImportError:
+        os.execv(venv_python, [venv_python] + sys.argv)
+
 from envs.drone_env import CityDroneEnv
 
 try:
