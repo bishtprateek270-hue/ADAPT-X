@@ -41,16 +41,36 @@ def launch_3d_disaster_simulation(checkpoint_path="checkpoints/phase3/best_polic
     history_dim = env.history_dim
 
     device = torch.device("cpu")
-    model = AdaptiveActorCritic(
-        obs_dim=obs_dim,
-        history_dim=history_dim,
-        act_dim=act_dim,
-        latent_dim=16
-    ).to(device)
+    is_heavy = "heavy" in checkpoint_path
+    if os.path.exists(checkpoint_path):
+        ckpt = torch.load(checkpoint_path, map_location=device)
+        state = ckpt.get("model_state_dict", ckpt)
+        if any("transformer" in k for k in state.keys()):
+            is_heavy = True
+
+    if is_heavy:
+        from agents.heavy_adaptive_ppo import HeavyAdaptiveActorCritic
+        model = HeavyAdaptiveActorCritic(
+            obs_dim=obs_dim,
+            single_proprio_dim=env.single_proprio_dim,
+            history_len=env.history_len,
+            act_dim=act_dim,
+            latent_dim=32,
+            hidden_dim=512
+        ).to(device)
+        print("[Architecture] Heavy Temporal Transformer + Deep ResNet (3.3M Params)")
+    else:
+        model = AdaptiveActorCritic(
+            obs_dim=obs_dim,
+            history_dim=history_dim,
+            act_dim=act_dim,
+            latent_dim=16
+        ).to(device)
 
     if os.path.exists(checkpoint_path):
         ckpt = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(ckpt["model_state_dict"])
+        state = ckpt.get("model_state_dict", ckpt)
+        model.load_state_dict(state)
         print(f"[Loaded Checkpoint] {checkpoint_path}")
     else:
         print(f"[Notice] Checkpoint {checkpoint_path} not found. Running with initial weights.")
@@ -86,9 +106,13 @@ def launch_3d_disaster_simulation(checkpoint_path="checkpoints/phase3/best_polic
             hist_t = torch.tensor(hist, dtype=torch.float32, device=device).unsqueeze(0)
 
             with torch.no_grad():
-                z = model.get_latent(hist_t)
-                x = torch.cat([obs_t, z], dim=-1)
-                action = model.actor_mean(x).squeeze(0).numpy()
+                if hasattr(model, "actor_mean"):
+                    z = model.get_latent(hist_t)
+                    x = torch.cat([obs_t, z], dim=-1)
+                    action = model.actor_mean(x).squeeze(0).numpy()
+                else:
+                    action, _, _, _, _ = model.get_action_and_value(obs_t, hist_t)
+                    action = action.squeeze(0).numpy()
 
             obs, hist, reward, terminated, truncated, info = env.step_adaptive(action)
 
