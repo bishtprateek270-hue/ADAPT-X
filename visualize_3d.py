@@ -132,7 +132,8 @@ def launch_3d_disaster_simulation(checkpoint_path="checkpoints/phase3/best_polic
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Launch ADAPT-X 3D Visual Simulation Window")
     parser.add_argument("--drone", action="store_true", help="Launch 3D City Drone Flight Simulation instead of Quadruped")
-    parser.add_argument("--checkpoint", type=str, default="checkpoints/phase3/best_policy.pt")
+    default_ckpt = "checkpoints/dgx_spark_heavy/phase5_best_policy.pt" if os.path.exists("checkpoints/dgx_spark_heavy/phase5_best_policy.pt") else "checkpoints/phase3/best_policy.pt"
+    parser.add_argument("--checkpoint", type=str, default=default_ckpt)
     parser.add_argument("--damage", type=str, default="amputated_leg")
     parser.add_argument("--leg", type=str, default="fr", choices=["fr", "fl", "rr", "rl"])
     parser.add_argument("--damage-step", type=int, default=150)
