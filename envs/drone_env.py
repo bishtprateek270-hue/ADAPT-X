@@ -66,6 +66,12 @@ class CityDroneEnv(gym.Env):
         # Step counter
         self.current_step = 0
 
+        # Adaptive Temporal History Buffer (RMA Architecture)
+        self.history_len = 20
+        self.single_proprio_dim = 17
+        self.history_dim = self.history_len * self.single_proprio_dim
+        self.history_buf = np.zeros((self.history_len, self.single_proprio_dim), dtype=np.float32)
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
@@ -171,3 +177,27 @@ class CityDroneEnv(gym.Env):
         yaw = np.arctan2(siny_cosp, cosy_cosp)
 
         return np.degrees(roll), np.degrees(pitch), np.degrees(yaw)
+
+    def _get_single_proprio(self):
+        return self._get_obs()
+
+    def reset_adaptive(self, seed=None, options=None):
+        obs, info = self.reset(seed=seed, options=options)
+        p0 = self._get_single_proprio()
+        for i in range(self.history_len):
+            self.history_buf[i] = p0
+        return obs, self.history_buf.flatten().copy(), info
+
+    def step_adaptive(self, action):
+        obs, reward, terminated, truncated, info = self.step(action)
+        p = self._get_single_proprio()
+        self.history_buf[:-1] = self.history_buf[1:]
+        self.history_buf[-1] = p
+        return obs, self.history_buf.flatten().copy(), reward, terminated, truncated, info
+
+    def apply_wind_gust(self, magnitude=10.0):
+        """Applies random lateral wind gust force in Newtons."""
+        gust = np.random.uniform(-magnitude, magnitude, size=3)
+        gust[2] = 0.0  # Horizontal wind
+        self.data.qfrc_applied[0:3] = gust
+

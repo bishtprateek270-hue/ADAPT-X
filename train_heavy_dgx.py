@@ -23,6 +23,7 @@ import torch.optim as optim
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from envs.quadruped_env import QuadrupedEnv
+from envs.drone_env import CityDroneEnv
 from envs.sim2real_utils import Sim2RealWrapper
 from agents.heavy_adaptive_ppo import HeavyAdaptiveActorCritic, HeavyDeployablePolicy
 
@@ -32,7 +33,8 @@ class HeavyDGXSparkTrainer:
     Heavy Deep Reinforcement Learning Trainer tailored for NVIDIA DGX Spark.
     Utilizes PyTorch CUDA BFloat16 Mixed Precision on Blackwell Tensor Cores.
     """
-    def __init__(self, device_id=0, num_envs=32, steps_per_env=256, use_amp=True):
+    def __init__(self, robot="drone", device_id=0, num_envs=32, steps_per_env=256, use_amp=True):
+        self.robot = robot
         self.device_id = device_id
         self.device = torch.device(f"cuda:{device_id}" if torch.cuda.is_available() else "cpu")
         self.gpu_name = torch.cuda.get_device_name(device_id) if torch.cuda.is_available() else "CPU"
@@ -56,6 +58,8 @@ class HeavyDGXSparkTrainer:
         print("=" * 85)
 
     def _make_env(self, phase, stage=1):
+        if self.robot == "drone":
+            return CityDroneEnv(target_pos=(0.0, 0.0, 4.5))
         config = {
             "system": {"device": "cuda", "num_cpu_threads": 4},
             "environment": {"target_height": 0.28, "dt": 0.02, "sim_substeps": 10},
@@ -96,14 +100,16 @@ class HeavyDGXSparkTrainer:
     # Phase 1: Baseline Nominal Locomotion
     # =========================================================================
     def train_phase1(self, timesteps=100_000, lr=3e-4):
+        robot_title = "QUADCOPTER DRONE" if self.robot == "drone" else "4-LEGGED QUADRUPED"
         print("\n" + "=" * 85)
-        print("  🟢 PHASE 1: BASELINE NOMINAL DYNAMICS (UNDAMAGED 4-LEGGED GAIT)")
+        print(f"  🟢 PHASE 1: BASELINE NOMINAL DYNAMICS ({robot_title})")
         print("=" * 85)
         print(f" Target Timesteps : {timesteps:,}")
         print(" Neural Trunk     : 4-Head Temporal Transformer + 512-wide Deep ResNet")
         print("-" * 85)
 
-        ckpt_path = "checkpoints/dgx_spark_heavy/phase1_best_policy.pt"
+        prefix = f"{self.robot}_" if self.robot != "quadruped" else ""
+        ckpt_path = f"checkpoints/dgx_spark_heavy/{prefix}phase1_best_policy.pt"
         envs = [self._make_env(phase=1) for _ in range(self.num_envs)]
         model = self._init_heavy_model(envs[0])
         optimizer = optim.AdamW(model.parameters(), lr=lr, eps=1e-5, weight_decay=1e-4)
@@ -124,7 +130,8 @@ class HeavyDGXSparkTrainer:
         print(" Fault Modes      : Dead motor, locked joint, weakened actuator, limb amputation")
         print("-" * 85)
 
-        ckpt_path = "checkpoints/dgx_spark_heavy/phase2_best_policy.pt"
+        prefix = f"{self.robot}_" if self.robot != "quadruped" else ""
+        ckpt_path = f"checkpoints/dgx_spark_heavy/{prefix}phase2_best_policy.pt"
         envs = [self._make_env(phase=2) for _ in range(self.num_envs)]
         model = self._init_heavy_model(envs[0])
 
@@ -151,7 +158,8 @@ class HeavyDGXSparkTrainer:
         print(" Latent Space     : Compresses 840 proprioception dimensions into z_t in R^32")
         print("-" * 85)
 
-        ckpt_path = "checkpoints/dgx_spark_heavy/phase3_best_policy.pt"
+        prefix = f"{self.robot}_" if self.robot != "quadruped" else ""
+        ckpt_path = f"checkpoints/dgx_spark_heavy/{prefix}phase3_best_policy.pt"
         envs = [self._make_env(phase=3) for _ in range(self.num_envs)]
         model = self._init_heavy_model(envs[0])
 
@@ -168,26 +176,30 @@ class HeavyDGXSparkTrainer:
     # =========================================================================
     # Phase 4: Staged Curriculum Resilience & External Push Impulses
     # =========================================================================
-    def train_phase4(self, timesteps_per_stage=50_000, lr=1.8e-4, resume_ckpt="checkpoints/dgx_spark_heavy/phase3_best_policy.pt"):
+    def train_phase4(self, timesteps_per_stage=50_000, lr=1.8e-4, resume_ckpt=None):
+        prefix = f"{self.robot}_" if self.robot != "quadruped" else ""
+        if resume_ckpt is None:
+            resume_ckpt = f"checkpoints/dgx_spark_heavy/{prefix}phase3_best_policy.pt"
+
         print("\n" + "=" * 85)
         print("  🟠 PHASE 4: MULTI-STAGE CURRICULUM RESILIENCE & DISTURBANCE STRESS TEST")
         print("=" * 85)
         print(" Stages:")
-        print("   * 4A: Pre-broken 3-legged hopping discovery (spawns 100% damaged)")
-        print("   * 4B: Dynamic mid-stride failure transition with forward velocity preservation")
-        print("   * 4C: Search & Rescue stress test with external force impulses (15N pushes)")
+        print("   * 4A: Pre-broken / Rotor Loss recovery discovery")
+        print("   * 4B: Dynamic mid-stride / in-flight failure transition")
+        print("   * 4C: Search & Rescue stress test with external force impulses")
         print("-" * 85)
 
         current_ckpt = resume_ckpt
         stages = [
-            (1, "Stage 4A: Pre-Broken 3-Legged Hopping Discovery"),
-            (2, "Stage 4B: Dynamic Mid-Stride Fault Transition"),
-            (3, "Stage 4C: Search & Rescue External 15N Force Push Impulses")
+            (1, "Stage 4A: Damage Recovery Discovery"),
+            (2, "Stage 4B: Dynamic Mid-Flight/Stride Fault Transition"),
+            (3, "Stage 4C: External Force Impulses & Wind Gusts")
         ]
 
         for stage_idx, stage_name in stages:
             print(f"\n>>> Running Phase 4 - {stage_name} ({timesteps_per_stage:,} steps)...")
-            ckpt_path = f"checkpoints/dgx_spark_heavy/phase4_stage{stage_idx}_best_policy.pt"
+            ckpt_path = f"checkpoints/dgx_spark_heavy/{prefix}phase4_stage{stage_idx}_best_policy.pt"
             envs = [self._make_env(phase=4, stage=stage_idx) for _ in range(self.num_envs)]
             model = self._init_heavy_model(envs[0])
 
@@ -201,21 +213,25 @@ class HeavyDGXSparkTrainer:
             for e in envs: e.close()
             current_ckpt = ckpt_path
 
-        final_phase4_ckpt = "checkpoints/dgx_spark_heavy/phase4_best_policy.pt"
+        final_phase4_ckpt = f"checkpoints/dgx_spark_heavy/{prefix}phase4_best_policy.pt"
         torch.save({"model_state_dict": model.state_dict()}, final_phase4_ckpt)
         return final_phase4_ckpt
 
     # =========================================================================
     # Phase 5: Sim-to-Real Gap Closure & Production ONNX Export
     # =========================================================================
-    def train_phase5_and_export(self, timesteps=60_000, lr=1e-4, resume_ckpt="checkpoints/dgx_spark_heavy/phase4_best_policy.pt"):
+    def train_phase5_and_export(self, timesteps=60_000, lr=1e-4, resume_ckpt=None):
+        prefix = f"{self.robot}_" if self.robot != "quadruped" else ""
+        if resume_ckpt is None:
+            resume_ckpt = f"checkpoints/dgx_spark_heavy/{prefix}phase4_best_policy.pt"
+
         print("\n" + "=" * 85)
         print("  🔵 PHASE 5: SIM-TO-REAL GAP CLOSURE & HEAVY PRODUCTION EXPORT")
         print("=" * 85)
         print(" Domain Randomization: IMU Gyro Noise, Joint Encoder Noise, CAN Bus Delay, Torso Mass & Friction.")
         print("-" * 85)
 
-        ckpt_path = "checkpoints/dgx_spark_heavy/phase5_best_policy.pt"
+        ckpt_path = f"checkpoints/dgx_spark_heavy/{prefix}phase5_best_policy.pt"
         envs = [self._make_env(phase=4, stage=2) for _ in range(self.num_envs)]
         sim2real = [Sim2RealWrapper(action_delay_steps=1, joint_noise_std=0.008, gyro_noise_std=0.015) for _ in range(self.num_envs)]
         model = self._init_heavy_model(envs[0])
@@ -231,8 +247,8 @@ class HeavyDGXSparkTrainer:
 
         # Production ONNX & TorchScript Compilation
         print("\n[Compiling & Exporting Production Heavy Model to ONNX & TorchScript...]")
-        onnx_out = "deployments/adaptx_heavy_dgx_spark.onnx"
-        ts_out = "deployments/adaptx_heavy_dgx_spark.torchscript.pt"
+        onnx_out = f"deployments/adaptx_heavy_{self.robot}.onnx"
+        ts_out = f"deployments/adaptx_heavy_{self.robot}.torchscript.pt"
 
         self._export_heavy_model(model, envs[0], onnx_out, ts_out)
         return onnx_out
@@ -299,18 +315,26 @@ class HeavyDGXSparkTrainer:
                 rewards, dones = [], []
 
                 for i in range(num_envs):
-                    raw_cmd = np.clip(act_np[i], -1.0, 1.0)
-                    cmd = sim2real[i].apply_action_delay(raw_cmd) if sim2real else raw_cmd
+                    if self.robot == "drone":
+                        cmd = np.clip(act_np[i] + 3.40, 0.0, 12.0)
+                        if phase >= 2 and step % 80 == 0:
+                            envs[i].inject_rotor_fault("dead_motor", "fr")
+                        if phase == 4 and step % 60 == 0:
+                            envs[i].apply_wind_gust(12.0)
+                    else:
+                        raw_cmd = np.clip(act_np[i], -1.0, 1.0)
+                        cmd = sim2real[i].apply_action_delay(raw_cmd) if sim2real else raw_cmd
 
                     o, h, r, term, trunc, info = envs[i].step_adaptive(cmd)
                     d = term or trunc
-                    vx_list.append(info.get("vx", 0.0))
+                    vx_list.append(info.get("vx", info.get("altitude", 0.0)))
 
                     if d:
                         o, h, _ = envs[i].reset_adaptive()
                         if sim2real:
                             sim2real[i].reset_buffer()
-                            sim2real[i].randomize_physics(envs[i].model, envs[i].data)
+                            if hasattr(envs[i], "model"):
+                                sim2real[i].randomize_physics(envs[i].model, envs[i].data)
 
                     if sim2real:
                         o = sim2real[i].add_sensor_noise(o)
@@ -477,6 +501,7 @@ class HeavyDGXSparkTrainer:
 
 def main():
     parser = argparse.ArgumentParser(description="ADAPT-X Heavy Deep RL Trainer for NVIDIA DGX Spark")
+    parser.add_argument("--robot", type=str, default="drone", choices=["drone", "quadruped"], help="Target robot (drone or quadruped)")
     parser.add_argument("--phase", type=str, default="all", choices=["1", "2", "3", "4", "5", "all"], help="Training phase")
     parser.add_argument("--num-envs", type=int, default=32, help="Parallel environments on DGX Spark")
     parser.add_argument("--device", type=int, default=0, help="Target CUDA device ID")
@@ -484,6 +509,7 @@ def main():
     args = parser.parse_args()
 
     trainer = HeavyDGXSparkTrainer(
+        robot=args.robot,
         device_id=args.device,
         num_envs=args.num_envs,
         steps_per_env=256,
@@ -491,10 +517,11 @@ def main():
     )
 
     t0 = time.time()
-    ckpt_p1 = "checkpoints/dgx_spark_heavy/phase1_best_policy.pt"
-    ckpt_p2 = "checkpoints/dgx_spark_heavy/phase2_best_policy.pt"
-    ckpt_p3 = "checkpoints/dgx_spark_heavy/phase3_best_policy.pt"
-    ckpt_p4 = "checkpoints/dgx_spark_heavy/phase4_best_policy.pt"
+    prefix = f"{args.robot}_" if args.robot != "quadruped" else ""
+    ckpt_p1 = f"checkpoints/dgx_spark_heavy/{prefix}phase1_best_policy.pt"
+    ckpt_p2 = f"checkpoints/dgx_spark_heavy/{prefix}phase2_best_policy.pt"
+    ckpt_p3 = f"checkpoints/dgx_spark_heavy/{prefix}phase3_best_policy.pt"
+    ckpt_p4 = f"checkpoints/dgx_spark_heavy/{prefix}phase4_best_policy.pt"
 
     if args.phase in ["1", "all"]:
         ckpt_p1 = trainer.train_phase1(timesteps=int(100_000 * args.scale))
@@ -508,7 +535,7 @@ def main():
         trainer.train_phase5_and_export(timesteps=int(60_000 * args.scale), resume_ckpt=ckpt_p4)
 
     print("\n" + "=" * 85)
-    print(f"🎉 Heavy Deep RL Training Completed in {time.time() - t0:.1f}s on NVIDIA DGX Spark!")
+    print(f"🎉 Heavy Deep RL Training for {args.robot.upper()} Completed in {time.time() - t0:.1f}s on NVIDIA DGX Spark!")
     print("=" * 85)
 
 

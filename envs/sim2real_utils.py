@@ -37,18 +37,21 @@ class Sim2RealWrapper:
     def add_sensor_noise(self, obs):
         """
         Injects realistic Gaussian white noise into observation channels:
-        obs: [ang_vel(3), proj_g(3), cmd(3), joint_pos(12), joint_vel(12), prev_act(12), lin_vel(3)]
+        Quadruped: [ang_vel(3), proj_g(3), cmd(3), joint_pos(12), joint_vel(12), prev_act(12), lin_vel(3)]
+        Drone: [pos_err(3), quat(4), lin_vel(3), ang_vel(3), rotor_health(4)]
         """
         noisy_obs = obs.copy()
-        
-        # 1. IMU Gyro Noise (Indices 0:3)
-        noisy_obs[0:3] += np.random.normal(0.0, self.gyro_noise_std, size=3)
-
-        # 2. Joint Encoder Angle Noise (Indices 9:21)
-        noisy_obs[9:21] += np.random.normal(0.0, self.joint_noise_std, size=12)
-
-        # 3. Joint Velocity Noise (Indices 21:33)
-        noisy_obs[21:33] += np.random.normal(0.0, self.joint_noise_std * 2.0, size=12)
+        if len(obs) == 17:
+            # Drone: IMU gyro, velocity estimate, position estimation noise
+            noisy_obs[0:3] += np.random.normal(0.0, 0.01, size=3)   # Position sensor noise
+            noisy_obs[7:10] += np.random.normal(0.0, 0.02, size=3)  # Velocity estimation noise
+            noisy_obs[10:13] += np.random.normal(0.0, self.gyro_noise_std, size=3) # IMU Gyro
+        else:
+            # Quadruped
+            noisy_obs[0:3] += np.random.normal(0.0, self.gyro_noise_std, size=3)
+            if len(obs) >= 33:
+                noisy_obs[9:21] += np.random.normal(0.0, self.joint_noise_std, size=12)
+                noisy_obs[21:33] += np.random.normal(0.0, self.joint_noise_std * 2.0, size=12)
 
         return noisy_obs.astype(np.float32)
 
