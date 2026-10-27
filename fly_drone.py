@@ -203,6 +203,16 @@ def run_drone_simulation(
     print("=" * 75 + "\n")
 
     with mujoco.viewer.launch_passive(env.model, env.data) as viewer:
+        # Automatically lock camera directly onto the Drone (close chase view)
+        try:
+            viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+            viewer.cam.trackbodyid = env.drone_body_id
+            viewer.cam.distance = 2.2
+            viewer.cam.elevation = -18
+            viewer.cam.azimuth = 90
+        except Exception:
+            pass
+
         while viewer.is_running():
             step_start = time.perf_counter()
             step += 1
