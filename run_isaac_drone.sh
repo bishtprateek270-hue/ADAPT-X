@@ -25,10 +25,27 @@ if command -v nvidia-smi &> /dev/null; then
 fi
 echo "----------------------------------------------------------------------"
 
-# Check for Isaac Lab Omniverse Kit
-if command -v isaaclab.sh &> /dev/null; then
-    echo "[NVIDIA Isaac Lab Detected!] Launching 4,096-Drone Omniverse GPU Simulation..."
-    ./isaaclab.sh -p isaac_lab/train_isaac_drone.py --phase "${PHASE}" --num_envs 4096
+# Check for Isaac Lab Omniverse Kit or Isaac Sim Docker Image
+ISAAC_CONTAINER="nvcr.io/nvidia/isaac-sim:4.2.0"
+CONTAINER_EXISTS=$(docker images -q "${ISAAC_CONTAINER}" 2>/dev/null || true)
+
+if [ -n "${CONTAINER_EXISTS}" ]; then
+    echo "[NVIDIA Isaac Sim Container Detected: ${ISAAC_CONTAINER}]"
+    echo "Launching 4,096-Drone Omniverse GPU PhysX 5 Simulation on GB10 GPU..."
+    docker run --rm \
+        --gpus all \
+        --network host \
+        -e "ACCEPT_EULA=Y" \
+        -e "PRIVACY_CONSENT=Y" \
+        -v /home/piet/ADAPT-X:/workspace/ADAPT-X \
+        -v /home/piet/IsaacLab:/workspace/IsaacLab \
+        -w /workspace/ADAPT-X \
+        "${ISAAC_CONTAINER}" \
+        bash -c "PYTHONPATH=/workspace/ADAPT-X:/workspace/IsaacLab/source/extensions/omni.isaac.lab /isaac-sim/python.sh isaac_lab/train_isaac_drone.py --phase '${PHASE}' --num_envs 4096"
+elif command -v isaaclab.sh &> /dev/null || [ -f "/home/piet/IsaacLab/isaaclab.sh" ]; then
+    ISAACLAB_BIN=$(command -v isaaclab.sh || echo "/home/piet/IsaacLab/isaaclab.sh")
+    echo "[NVIDIA Isaac Lab Detected at ${ISAACLAB_BIN}!] Launching 4,096-Drone Omniverse GPU Simulation..."
+    "${ISAACLAB_BIN}" -p isaac_lab/train_isaac_drone.py --phase "${PHASE}" --num_envs 4096
 else
     echo "[Running Native DGX Spark GPU Tensor Engine on GB10 GPU...]"
     /home/piet/ADAPT-X/.venv/bin/python train_heavy_dgx.py \
