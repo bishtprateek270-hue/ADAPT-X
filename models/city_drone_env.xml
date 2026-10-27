@@ -35,15 +35,22 @@
     <material name="lamp_light_mat" rgba="0.98 0.98 0.82 1.0" emission="0.9"/>
 
     <!-- Drone Materials (Matte Carbon Fiber + Metallic Rotors) -->
-    <material name="drone_carbon_mat" rgba="0.09 0.10 0.12 1.0" specular="0.8" shininess="0.8"/>
-    <material name="drone_arm_mat" rgba="0.14 0.15 0.17 1.0" specular="0.5"/>
-    <material name="rotor_front_mat" rgba="0.95 0.20 0.15 0.80" specular="0.85"/>
-    <material name="rotor_rear_mat" rgba="0.20 0.22 0.26 0.80" specular="0.85"/>
-    <material name="motor_mat" rgba="0.82 0.84 0.88 1.0" specular="0.95"/>
-    <material name="camera_lens_mat" rgba="0.1 0.3 0.6 1.0" specular="0.95" reflectance="0.5"/>
-    <material name="led_green" rgba="0.1 0.98 0.2 1.0" emission="0.9"/>
-    <material name="led_red" rgba="0.98 0.1 0.1 1.0" emission="0.9"/>
-    <material name="led_blue" rgba="0.1 0.5 0.98 1.0" emission="0.9"/>
+    <material name="drone_carbon_mat" rgba="0.08 0.09 0.11 1.0" specular="0.85" shininess="0.9"/>
+    <material name="drone_arm_mat" rgba="0.12 0.13 0.15 1.0" specular="0.6" shininess="0.7"/>
+    <material name="motor_mat" rgba="0.25 0.26 0.28 1.0" specular="0.95" shininess="0.9"/>
+    <material name="motor_gold_mat" rgba="0.85 0.62 0.18 1.0" specular="0.95" shininess="0.9"/>
+    <material name="anodized_red" rgba="0.92 0.12 0.12 1.0" specular="0.95" shininess="0.95"/>
+    <material name="rotor_front_mat" rgba="0.92 0.18 0.14 0.75" specular="0.85"/>
+    <material name="rotor_rear_mat" rgba="0.18 0.20 0.24 0.75" specular="0.85"/>
+    <material name="prop_hub_mat" rgba="0.95 0.95 0.98 1.0" specular="0.95"/>
+    <material name="battery_mat" rgba="0.16 0.17 0.19 1.0" specular="0.2"/>
+    <material name="battery_label_mat" rgba="0.95 0.75 0.05 1.0"/>
+    <material name="camera_gimbal_mat" rgba="0.20 0.21 0.24 1.0" specular="0.7"/>
+    <material name="camera_lens_mat" rgba="0.08 0.25 0.65 1.0" specular="0.98" reflectance="0.6"/>
+    <material name="led_green" rgba="0.05 0.98 0.2 1.0" emission="1.0"/>
+    <material name="led_red" rgba="0.98 0.05 0.05 1.0" emission="1.0"/>
+    <material name="led_blue" rgba="0.1 0.5 0.98 1.0" emission="1.0"/>
+    <material name="led_white" rgba="0.98 0.98 0.98 1.0" emission="1.0"/>
   </asset>
 
   <worldbody>
@@ -194,62 +201,83 @@
 
     <!-- ================= THE SELF-HEALING QUADCOPTER DRONE ================= -->
     <!-- Spawned in Mid-Air Flying at Z = 4.5 meters in the open sky -->
+    <!-- ================= HIGH-FIDELITY ENTERPRISE QUADCOPTER DRONE ================= -->
     <body name="drone" pos="0.0 0.0 4.5">
       <freejoint name="drone_root"/>
 
-      <!-- Built-in Cameras Following Drone -->
+      <!-- Built-in Cinematic Cameras -->
       <camera name="drone_chase" pos="-1.6 0 0.7" xyaxes="0 -1 0 0.35 0 0.93"/>
       <camera name="drone_fpv" pos="0.14 0 0.02" xyaxes="0 -1 0 0 0 1"/>
       <camera name="drone_top" pos="0 0 2.5" xyaxes="1 0 0 0 1 0"/>
       
-      <!-- Central Aerodynamic Carbon-Fiber Fuselage -->
-      <geom name="fuselage" type="box" size="0.12 0.09 0.035" mass="0.60" material="drone_carbon_mat"/>
-      <geom name="top_canopy" type="ellipsoid" pos="0 0 0.03" size="0.10 0.07 0.02" mass="0.08" material="drone_carbon_mat"/>
-      
-      <!-- FPV Front Camera Dome Gimbal -->
-      <geom name="gimbal_base" type="sphere" pos="0.11 0 -0.01" size="0.025" mass="0.04" material="drone_carbon_mat"/>
-      <geom name="camera_lens" type="sphere" pos="0.125 0 -0.01" size="0.014" mass="0.01" material="camera_lens_mat"/>
+      <!-- Dual-Deck Aerodynamic Carbon-Fiber Chassis -->
+      <geom name="chassis_lower" type="box" pos="0 0 -0.015" size="0.13 0.08 0.004" mass="0.22" material="drone_carbon_mat"/>
+      <geom name="chassis_upper" type="box" pos="0 0 0.015" size="0.12 0.07 0.003" mass="0.15" material="drone_carbon_mat"/>
+      <geom name="chassis_core" type="box" pos="0 0 0.0" size="0.09 0.06 0.015" mass="0.15" material="drone_arm_mat"/>
+      <geom name="top_canopy" type="ellipsoid" pos="0.01 0 0.028" size="0.09 0.055 0.015" mass="0.06" material="drone_carbon_mat"/>
 
-      <!-- Status Indicator LEDs -->
-      <geom name="led_f" type="sphere" pos="0.11 0 0.015" size="0.015" material="led_green"/>
-      <geom name="led_r" type="sphere" pos="-0.11 0 0.015" size="0.015" material="led_red"/>
-      <geom name="led_side" type="sphere" pos="0 0 0.045" size="0.012" material="led_blue"/>
+      <!-- High-Capacity LiPo Battery with XT60 Connector -->
+      <geom name="battery_pack" type="box" pos="-0.02 0 -0.032" size="0.065 0.038 0.014" mass="0.28" material="battery_mat"/>
+      <geom name="battery_strap" type="box" pos="-0.02 0 -0.032" size="0.02 0.039 0.015" mass="0.01" material="battery_label_mat"/>
 
-      <!-- Landing Struts / Skids -->
-      <geom name="skid_left" type="capsule" fromto="0.10 0.08 -0.06 -0.10 0.08 -0.06" size="0.008" mass="0.04" material="drone_arm_mat"/>
-      <geom name="skid_right" type="capsule" fromto="0.10 -0.08 -0.06 -0.10 -0.08 -0.06" size="0.008" mass="0.04" material="drone_arm_mat"/>
-      <geom name="leg_fl" type="capsule" fromto="0.07 0.06 -0.01 0.08 0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
-      <geom name="leg_fr" type="capsule" fromto="0.07 -0.06 -0.01 0.08 -0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
-      <geom name="leg_rl" type="capsule" fromto="-0.07 0.06 -0.01 -0.08 0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
-      <geom name="leg_rr" type="capsule" fromto="-0.07 -0.06 -0.01 -0.08 -0.08 -0.06" size="0.006" mass="0.01" material="drone_arm_mat"/>
+      <!-- 3-Axis Stabilized 4K Camera Gimbal & Obstacle Sensors -->
+      <geom name="gimbal_yaw" type="cylinder" pos="0.10 0 -0.018" size="0.012 0.008" mass="0.02" material="camera_gimbal_mat"/>
+      <geom name="gimbal_pitch" type="cylinder" pos="0.115 0 -0.025" size="0.010 0.012" mass="0.02" material="camera_gimbal_mat"/>
+      <geom name="camera_housing" type="box" pos="0.125 0 -0.025" size="0.015 0.014 0.012" mass="0.03" material="camera_gimbal_mat"/>
+      <geom name="camera_lens" type="cylinder" pos="0.142 0 -0.025" size="0.009 0.003" mass="0.01" material="camera_lens_mat"/>
+      <!-- Stereo Forward Obstacle Avoidance Cameras -->
+      <geom name="stereo_cam_l" type="cylinder" pos="0.11 0.035 0.018" size="0.005 0.004" mass="0.005" material="camera_lens_mat"/>
+      <geom name="stereo_cam_r" type="cylinder" pos="0.11 -0.035 0.018" size="0.005 0.004" mass="0.005" material="camera_lens_mat"/>
 
-      <!-- Cross Carbon Fiber Rotor Arms -->
-      <!-- Arm 1: Front-Right (+X, -Y) -->
-      <geom name="arm_fr" type="capsule" fromto="0 0 0 0.18 -0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
-      <geom name="motor_fr" type="cylinder" pos="0.18 -0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
-      <!-- Rotor 1 Propeller Blade (Red = Front) -->
-      <geom name="prop_fr" type="cylinder" pos="0.18 -0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_front_mat"/>
+      <!-- Aviation Navigation & Strobe LEDs -->
+      <geom name="nav_led_fl" type="sphere" pos="0.17 0.17 0.015" size="0.008" material="led_green"/>
+      <geom name="nav_led_fr" type="sphere" pos="0.17 -0.17 0.015" size="0.008" material="led_red"/>
+      <geom name="nav_led_rr" type="sphere" pos="-0.17 -0.17 0.015" size="0.008" material="led_white"/>
+      <geom name="nav_led_rl" type="sphere" pos="-0.17 0.17 0.015" size="0.008" material="led_white"/>
+      <geom name="beacon_dorsal" type="cylinder" pos="0 0 0.045" size="0.008 0.004" material="led_blue"/>
+
+      <!-- Landing Gear Skids with Vibration Dampeners -->
+      <geom name="skid_leg_fl" type="capsule" fromto="0.06 0.05 -0.015 0.08 0.075 -0.07" size="0.005" mass="0.015" material="drone_arm_mat"/>
+      <geom name="skid_leg_fr" type="capsule" fromto="0.06 -0.05 -0.015 0.08 -0.075 -0.07" size="0.005" mass="0.015" material="drone_arm_mat"/>
+      <geom name="skid_leg_rl" type="capsule" fromto="-0.06 0.05 -0.015 -0.08 0.075 -0.07" size="0.005" mass="0.015" material="drone_arm_mat"/>
+      <geom name="skid_leg_rr" type="capsule" fromto="-0.06 -0.05 -0.015 -0.08 -0.075 -0.07" size="0.005" mass="0.015" material="drone_arm_mat"/>
+      <geom name="skid_tube_l" type="capsule" fromto="0.11 0.075 -0.07 -0.11 0.075 -0.07" size="0.006" mass="0.02" material="drone_carbon_mat"/>
+      <geom name="skid_tube_r" type="capsule" fromto="0.11 -0.075 -0.07 -0.11 -0.075 -0.07" size="0.006" mass="0.02" material="drone_carbon_mat"/>
+
+      <!-- ================= ROTOR ARM 1: FRONT-RIGHT (+X, -Y) ================= -->
+      <geom name="arm_fr" type="capsule" fromto="0.05 -0.04 0.0 0.18 -0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
+      <geom name="motor_fr_base" type="cylinder" pos="0.18 -0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
+      <geom name="motor_fr_stator" type="cylinder" pos="0.18 -0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
+      <geom name="motor_fr_bell" type="cylinder" pos="0.18 -0.18 0.032" size="0.015 0.008" mass="0.025" material="anodized_red"/>
+      <geom name="prop_hub_fr" type="cylinder" pos="0.18 -0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
+      <geom name="prop_fr_b1" type="box" pos="0.18 -0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_front_mat"/>
       <site name="thrust_site_fr" pos="0.18 -0.18 0.045"/>
 
-      <!-- Arm 2: Front-Left (+X, +Y) -->
-      <geom name="arm_fl" type="capsule" fromto="0 0 0 0.18 0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
-      <geom name="motor_fl" type="cylinder" pos="0.18 0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
-      <!-- Rotor 2 Propeller Blade (Red = Front) -->
-      <geom name="prop_fl" type="cylinder" pos="0.18 0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_front_mat"/>
+      <!-- ================= ROTOR ARM 2: FRONT-LEFT (+X, +Y) ================= -->
+      <geom name="arm_fl" type="capsule" fromto="0.05 0.04 0.0 0.18 0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
+      <geom name="motor_fl_base" type="cylinder" pos="0.18 0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
+      <geom name="motor_fl_stator" type="cylinder" pos="0.18 0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
+      <geom name="motor_fl_bell" type="cylinder" pos="0.18 0.18 0.032" size="0.015 0.008" mass="0.025" material="anodized_red"/>
+      <geom name="prop_hub_fl" type="cylinder" pos="0.18 0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
+      <geom name="prop_fl_b1" type="box" pos="0.18 0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_front_mat"/>
       <site name="thrust_site_fl" pos="0.18 0.18 0.045"/>
 
-      <!-- Arm 3: Rear-Right (-X, -Y) -->
-      <geom name="arm_rr" type="capsule" fromto="0 0 0 -0.18 -0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
-      <geom name="motor_rr" type="cylinder" pos="-0.18 -0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
-      <!-- Rotor 3 Propeller Blade (Dark Grey = Rear) -->
-      <geom name="prop_rr" type="cylinder" pos="-0.18 -0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_rear_mat"/>
+      <!-- ================= ROTOR ARM 3: REAR-RIGHT (-X, -Y) ================= -->
+      <geom name="arm_rr" type="capsule" fromto="-0.05 -0.04 0.0 -0.18 -0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
+      <geom name="motor_rr_base" type="cylinder" pos="-0.18 -0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
+      <geom name="motor_rr_stator" type="cylinder" pos="-0.18 -0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
+      <geom name="motor_rr_bell" type="cylinder" pos="-0.18 -0.18 0.032" size="0.015 0.008" mass="0.025" material="motor_mat"/>
+      <geom name="prop_hub_rr" type="cylinder" pos="-0.18 -0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
+      <geom name="prop_rr_b1" type="box" pos="-0.18 -0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_rear_mat"/>
       <site name="thrust_site_rr" pos="-0.18 -0.18 0.045"/>
 
-      <!-- Arm 4: Rear-Left (-X, +Y) -->
-      <geom name="arm_rl" type="capsule" fromto="0 0 0 -0.18 0.18 0.015" size="0.01" mass="0.05" material="drone_arm_mat"/>
-      <geom name="motor_rl" type="cylinder" pos="-0.18 0.18 0.025" size="0.022 0.018" mass="0.06" material="motor_mat"/>
-      <!-- Rotor 4 Propeller Blade (Dark Grey = Rear) -->
-      <geom name="prop_rl" type="cylinder" pos="-0.18 0.18 0.045" size="0.12 0.003" mass="0.015" material="rotor_rear_mat"/>
+      <!-- ================= ROTOR ARM 4: REAR-LEFT (-X, +Y) ================= -->
+      <geom name="arm_rl" type="capsule" fromto="-0.05 0.04 0.0 -0.18 0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
+      <geom name="motor_rl_base" type="cylinder" pos="-0.18 0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
+      <geom name="motor_rl_stator" type="cylinder" pos="-0.18 0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
+      <geom name="motor_rl_bell" type="cylinder" pos="-0.18 0.18 0.032" size="0.015 0.008" mass="0.025" material="motor_mat"/>
+      <geom name="prop_hub_rl" type="cylinder" pos="-0.18 0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
+      <geom name="prop_rl_b1" type="box" pos="-0.18 0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_rear_mat"/>
       <site name="thrust_site_rl" pos="-0.18 0.18 0.045"/>
 
       <site name="drone_imu" pos="0 0 0"/>

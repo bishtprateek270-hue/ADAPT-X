@@ -45,7 +45,7 @@ if [ -n "${CONTAINER_EXISTS}" ]; then
         -w /workspace/ADAPT-X \
         --entrypoint bash \
         "${ISAAC_CONTAINER}" \
-        -c "PYTHONPATH=/workspace/ADAPT-X:/workspace/IsaacLab/source/extensions/omni.isaac.lab /isaac-sim/python.sh isaac_lab/train_isaac_drone.py --phase '${PHASE}' --num_envs 4096"
+        -c "PYTHONPATH=/workspace/ADAPT-X:/workspace/IsaacLab/source/isaaclab:/workspace/IsaacLab/source/isaaclab_assets:/workspace/IsaacLab/source/isaaclab_tasks /isaac-sim/python.sh isaac_lab/train_isaac_drone.py --phase '${PHASE}' --num_envs 4096"
 elif command -v isaaclab.sh &> /dev/null || [ -f "/home/piet/IsaacLab/isaaclab.sh" ]; then
     ISAACLAB_BIN=$(command -v isaaclab.sh || echo "/home/piet/IsaacLab/isaaclab.sh")
     echo "[NVIDIA Isaac Lab Detected at ${ISAACLAB_BIN}!] Launching 4,096-Drone Omniverse GPU Simulation..."
