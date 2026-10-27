@@ -26,8 +26,11 @@ fi
 echo "----------------------------------------------------------------------"
 
 # Check for Isaac Lab Omniverse Kit or Isaac Sim Docker Image
-ISAAC_CONTAINER="nvcr.io/nvidia/isaac-sim:4.2.0"
-CONTAINER_EXISTS=$(docker images -q "${ISAAC_CONTAINER}" 2>/dev/null || true)
+ISAAC_CONTAINER="nvcr.io/nvidia/isaac-sim:6.2.0"
+CONTAINER_EXISTS=$(docker images -q "${ISAAC_CONTAINER}" 2>/dev/null || docker images -q "nvcr.io/nvidia/isaac-sim:6.0.1" 2>/dev/null || docker images -q "nvcr.io/nvidia/isaac-sim:5.1.0" 2>/dev/null || true)
+if [ -z "${CONTAINER_EXISTS}" ]; then
+    ISAAC_CONTAINER="nvcr.io/nvidia/isaac-sim:6.2.0"
+fi
 
 if [ -n "${CONTAINER_EXISTS}" ]; then
     echo "[NVIDIA Isaac Sim Container Detected: ${ISAAC_CONTAINER}]"
