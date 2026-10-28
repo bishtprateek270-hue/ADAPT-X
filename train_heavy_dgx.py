@@ -316,11 +316,13 @@ class HeavyDGXSparkTrainer:
 
                 for i in range(num_envs):
                     if self.robot == "drone":
-                        cmd = np.clip(act_np[i] + 3.40, 0.0, 12.0)
-                        if phase >= 2 and step % 80 == 0:
-                            envs[i].inject_rotor_fault("dead_motor", "fr")
-                        if phase == 4 and step % 60 == 0:
-                            envs[i].apply_wind_gust(12.0)
+                        cmd = np.clip(act_np[i] + 3.75, 0.0, 12.0)
+                        if phase >= 2 and np.random.rand() < 0.04 and envs[i].fault_type == "none":
+                            victim = np.random.choice(["fr", "fl", "rr", "rl"])
+                            fault = "dead_motor" if np.random.rand() < 0.8 else "damaged_blade"
+                            envs[i].inject_rotor_fault(fault, victim)
+                        if phase >= 4 and step % 50 == 0:
+                            envs[i].apply_wind_gust(8.0)
                     else:
                         raw_cmd = np.clip(act_np[i], -1.0, 1.0)
                         cmd = sim2real[i].apply_action_delay(raw_cmd) if sim2real else raw_cmd

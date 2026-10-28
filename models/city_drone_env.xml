@@ -1,6 +1,6 @@
 <mujoco model="adaptx_self_healing_drone_city">
   <compiler angle="radian" coordinate="local"/>
-  <option timestep="0.005" iterations="4" solver="Newton" gravity="0 0 -9.81"/>
+  <option timestep="0.005" iterations="4" solver="Newton" gravity="0 0 -9.81" density="1.2" viscosity="0.000018"/>
 
   <visual>
     <global offwidth="1280" offheight="720"/>
@@ -255,36 +255,52 @@
       <geom name="motor_fr_base" type="cylinder" pos="0.18 -0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
       <geom name="motor_fr_stator" type="cylinder" pos="0.18 -0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
       <geom name="motor_fr_bell" type="cylinder" pos="0.18 -0.18 0.032" size="0.015 0.008" mass="0.025" material="anodized_red"/>
-      <geom name="prop_hub_fr" type="cylinder" pos="0.18 -0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
-      <geom name="prop_fr_b1" type="box" pos="0.18 -0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_front_mat"/>
       <site name="thrust_site_fr" pos="0.18 -0.18 0.045"/>
+      <body name="prop_fr" pos="0.18 -0.18 0.044">
+        <joint name="prop_fr_joint" type="hinge" axis="0 0 1" damping="0.0001"/>
+        <geom name="prop_hub_fr" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
+        <geom name="prop_fr_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_front_mat"/>
+        <geom name="prop_fr_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_front_mat"/>
+      </body>
 
       <!-- ================= ROTOR ARM 2: FRONT-LEFT (+X, +Y) ================= -->
       <geom name="arm_fl" type="capsule" fromto="0.05 0.04 0.0 0.18 0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
       <geom name="motor_fl_base" type="cylinder" pos="0.18 0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
       <geom name="motor_fl_stator" type="cylinder" pos="0.18 0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
       <geom name="motor_fl_bell" type="cylinder" pos="0.18 0.18 0.032" size="0.015 0.008" mass="0.025" material="anodized_red"/>
-      <geom name="prop_hub_fl" type="cylinder" pos="0.18 0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
-      <geom name="prop_fl_b1" type="box" pos="0.18 0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_front_mat"/>
       <site name="thrust_site_fl" pos="0.18 0.18 0.045"/>
+      <body name="prop_fl" pos="0.18 0.18 0.044">
+        <joint name="prop_fl_joint" type="hinge" axis="0 0 1" damping="0.0001"/>
+        <geom name="prop_hub_fl" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
+        <geom name="prop_fl_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_front_mat"/>
+        <geom name="prop_fl_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_front_mat"/>
+      </body>
 
       <!-- ================= ROTOR ARM 3: REAR-RIGHT (-X, -Y) ================= -->
       <geom name="arm_rr" type="capsule" fromto="-0.05 -0.04 0.0 -0.18 -0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
       <geom name="motor_rr_base" type="cylinder" pos="-0.18 -0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
       <geom name="motor_rr_stator" type="cylinder" pos="-0.18 -0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
       <geom name="motor_rr_bell" type="cylinder" pos="-0.18 -0.18 0.032" size="0.015 0.008" mass="0.025" material="motor_mat"/>
-      <geom name="prop_hub_rr" type="cylinder" pos="-0.18 -0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
-      <geom name="prop_rr_b1" type="box" pos="-0.18 -0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_rear_mat"/>
       <site name="thrust_site_rr" pos="-0.18 -0.18 0.045"/>
+      <body name="prop_rr" pos="-0.18 -0.18 0.044">
+        <joint name="prop_rr_joint" type="hinge" axis="0 0 1" damping="0.0001"/>
+        <geom name="prop_hub_rr" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
+        <geom name="prop_rr_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_rear_mat"/>
+        <geom name="prop_rr_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_rear_mat"/>
+      </body>
 
       <!-- ================= ROTOR ARM 4: REAR-LEFT (-X, +Y) ================= -->
       <geom name="arm_rl" type="capsule" fromto="-0.05 0.04 0.0 -0.18 0.18 0.012" size="0.008" mass="0.035" material="drone_carbon_mat"/>
       <geom name="motor_rl_base" type="cylinder" pos="-0.18 0.18 0.016" size="0.016 0.006" mass="0.02" material="motor_mat"/>
       <geom name="motor_rl_stator" type="cylinder" pos="-0.18 0.18 0.024" size="0.014 0.006" mass="0.02" material="motor_gold_mat"/>
       <geom name="motor_rl_bell" type="cylinder" pos="-0.18 0.18 0.032" size="0.015 0.008" mass="0.025" material="motor_mat"/>
-      <geom name="prop_hub_rl" type="cylinder" pos="-0.18 0.18 0.044" size="0.008 0.005" mass="0.005" material="prop_hub_mat"/>
-      <geom name="prop_rl_b1" type="box" pos="-0.18 0.18 0.044" size="0.11 0.011 0.0018" mass="0.01" material="rotor_rear_mat"/>
       <site name="thrust_site_rl" pos="-0.18 0.18 0.045"/>
+      <body name="prop_rl" pos="-0.18 0.18 0.044">
+        <joint name="prop_rl_joint" type="hinge" axis="0 0 1" damping="0.0001"/>
+        <geom name="prop_hub_rl" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
+        <geom name="prop_rl_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_rear_mat"/>
+        <geom name="prop_rl_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_rear_mat"/>
+      </body>
 
       <site name="drone_imu" pos="0 0 0"/>
     </body>

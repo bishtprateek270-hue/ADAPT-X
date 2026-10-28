@@ -20,15 +20,15 @@ import numpy as np
 # Check for Isaac Sim / Isaac Lab installation
 ISAAC_APP_TYPE = None
 try:
-    from isaacsim.simulation_app import SimulationApp
+    from isaacsim.simulation_app import SimulationApp  # pyrefly: ignore[missing-import]
     ISAAC_APP_TYPE = "simulation_app"
 except ImportError:
     try:
-        from omni.isaac.kit import SimulationApp
+        from omni.isaac.kit import SimulationApp  # pyrefly: ignore[missing-import]
         ISAAC_APP_TYPE = "simulation_app"
     except ImportError:
         try:
-            from omni.isaac.lab.app import AppLauncher
+            from omni.isaac.lab.app import AppLauncher  # pyrefly: ignore[missing-import]
             ISAAC_APP_TYPE = "app_launcher"
         except ImportError:
             ISAAC_APP_TYPE = None
@@ -83,8 +83,8 @@ def run_isaac_drone_training(args):
     else:
         simulation_app = SimulationApp({"headless": True})
 
-    from isaacsim.core.api.world import World
-    from isaacsim.core.api.objects import GroundPlane
+    from isaacsim.core.api.world import World  # pyrefly: ignore[missing-import]
+    from isaacsim.core.api.objects import GroundPlane  # pyrefly: ignore[missing-import]
 
     print("=" * 85)
     print("       ADAPT-X: NVIDIA ISAAC SIM 6.2.0 DRONE GPU TENSOR REINFORCEMENT LEARNING")

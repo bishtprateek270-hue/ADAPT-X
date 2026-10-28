@@ -114,31 +114,56 @@ def run_drone_simulation(
         T_total = (env.mass * env.gravity + kp_z * ez - kd_z * curr_vel[2]) / cos_tilt
 
         health = env.rotor_health
+        B_alloc = np.array([
+            [ 1.0,   1.0,   1.0,   1.0  ],
+            [-0.18,  0.18, -0.18,  0.18 ],
+            [-0.18, -0.18,  0.18,  0.18 ],
+            [-0.02,  0.02,  0.02, -0.02 ]
+        ])
+
         if np.all(health == 1.0):
             # 4-Rotor Nominal Decoupled Control
             tau_x = - kp_att * (gy - roll_des) - kd_att * wx
             tau_y = - kp_att * (-gx - pitch_des) - kd_att * wy
+            tau_yaw = - 0.35 * wz
 
-            f_h = T_total / 4.0
-            df_roll = tau_x / (4.0 * l)
-            df_pitch = tau_y / (4.0 * l)
-
-            u_fr = f_h - df_roll - df_pitch
-            u_fl = f_h + df_roll - df_pitch
-            u_rr = f_h - df_roll + df_pitch
-            u_rl = f_h + df_roll + df_pitch
-            u = [u_fr, u_fl, u_rr, u_rl]
+            w_cmd = np.array([T_total, tau_x, tau_y, tau_yaw])
+            u = np.linalg.inv(B_alloc) @ w_cmd
         else:
-            # Self-Healing Adaptive Bi-Rotor Dynamic Rebalancing
+            # ⚡ ADAPT-X SELF-HEALING ROTOR RECOVERY
+            # Instantly locks to plaza center to eliminate building collisions
+            x_des, y_des, z_des = 0.0, 0.0, target_altitude
             dead_idx = int(np.argmin(health))
-            f_diag = T_total / 2.0
+            alive = [j for j in range(4) if j != dead_idx]
+            inv_B = np.linalg.inv(B_alloc[:3, alive])
 
-            if dead_idx in [0, 3]:  # FR or RL failed -> active diagonal FL & RR
-                diff = - 4.0 * (x_q - y_q) - 0.5 * (wx - wy)
-                u = [0.0, f_diag + diff, f_diag - diff, 0.0]
-            else:  # FL or RR failed -> active diagonal FR & RL
-                diff = - 4.0 * (x_q + y_q) - 0.5 * (wx + wy)
-                u = [f_diag + diff, 0.0, 0.0, f_diag - diff]
+            R = np.array([
+                [1 - 2*(y_q**2 + z_q**2), 2*(x_q*y_q - z_q*w), 2*(x_q*z_q + y_q*w)],
+                [2*(x_q*y_q + z_q*w), 1 - 2*(x_q**2 + z_q**2), 2*(y_q*z_q - x_q*w)],
+                [2*(x_q*z_q - y_q*w), 2*(y_q*z_q + x_q*w), 1 - 2*(x_q**2 + y_q**2)]
+            ])
+            z_b_world = R[:, 2]
+            c_tilt = np.clip(z_b_world[2], 0.35, 1.0)
+            ez = z_des - curr_pos[2]
+            Fz_des = np.clip((env.mass * env.gravity + 30.0 * ez - 9.0 * curr_vel[2]) / c_tilt, 2.0, 36.0)
+
+            # Restoring acceleration towards center plaza
+            a_x_w = np.clip(0.65 * (0.0 - curr_pos[0]) - 0.85 * curr_vel[0], -0.8, 0.8)
+            a_y_w = np.clip(0.65 * (0.0 - curr_pos[1]) - 0.85 * curr_vel[1], -0.8, 0.8)
+
+            z_b_des = np.array([a_x_w / env.gravity, a_y_w / env.gravity, 1.0])
+            z_b_des = z_b_des / np.linalg.norm(z_b_des)
+
+            err_w = np.cross(z_b_world, z_b_des)
+            err_b = R.T @ err_w
+
+            tau_x = 4.2 * err_b[0] - 0.55 * wx
+            tau_y = 4.2 * err_b[1] - 0.55 * wy
+
+            f_alive = inv_B @ np.array([Fz_des, tau_x, tau_y])
+            u = np.zeros(4)
+            for k, al in enumerate(alive):
+                u[al] = f_alive[k]
 
         return np.clip(u, 0.0, 12.0), (x_des, y_des, z_des)
 

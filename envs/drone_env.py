@@ -66,6 +66,18 @@ class CityDroneEnv(gym.Env):
         # Step counter
         self.current_step = 0
 
+        # Propeller rotation tracking
+        self.prop_joint_names = ["prop_fr_joint", "prop_fl_joint", "prop_rr_joint", "prop_rl_joint"]
+        self.prop_qpos_indices = []
+        self.prop_spin_dirs = np.array([-1.0, 1.0, 1.0, -1.0], dtype=np.float32)  # FR CW, FL CCW, RR CCW, RL CW
+        for name in self.prop_joint_names:
+            try:
+                j_id = self.model.joint(name).id
+                self.prop_qpos_indices.append(self.model.jnt_qposadr[j_id])
+            except Exception:
+                pass
+        self.prop_angles = np.zeros(4, dtype=np.float32)
+
         # Adaptive Temporal History Buffer (RMA Architecture)
         self.history_len = 20
         self.single_proprio_dim = 17
@@ -81,6 +93,11 @@ class CityDroneEnv(gym.Env):
         self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
         self.data.qvel[:] = 0.0
 
+        # Reset propeller angles
+        self.prop_angles[:] = 0.0
+        for q_idx in self.prop_qpos_indices:
+            self.data.qpos[q_idx] = 0.0
+
         # Reset rotor health
         self.rotor_health = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
         self.fault_type = "none"
@@ -90,24 +107,28 @@ class CityDroneEnv(gym.Env):
         mujoco.mj_forward(self.model, self.data)
         return self._get_obs(), {}
 
-    def inject_rotor_fault(self, fault_type="dead_motor", rotor="fr"):
+    def inject_rotor_fault(self, fault_type="dead_motor", rotor=None):
         """
         Injects a mid-air hardware failure on a specific rotor.
-        rotor: 'fr', 'fl', 'rr', 'rl'
+        rotor: 'fr', 'fl', 'rr', 'rl' (if None, picks randomly)
         fault_type: 'dead_motor' (0% thrust), 'damaged_blade' (50% thrust)
         """
+        if rotor is None:
+            rotor = np.random.choice(["fr", "fl", "rr", "rl"])
+            
         rotor_map = {"fr": 0, "fl": 1, "rr": 2, "rl": 3}
-        idx = rotor_map.get(rotor.lower(), 0)
+        idx = rotor_map.get(str(rotor).lower(), 0)
 
         self.fault_type = fault_type
-        self.fault_rotor = rotor.upper()
+        self.fault_rotor = str(rotor).upper()
 
         if fault_type == "dead_motor":
             self.rotor_health[idx] = 0.0
         elif fault_type == "damaged_blade":
             self.rotor_health[idx] = 0.5
         elif fault_type == "none":
-            self.rotor_health[idx] = 1.0
+            self.rotor_health[:] = 1.0
+            self.fault_rotor = None
 
     def step(self, action):
         self.current_step += 1
@@ -119,31 +140,68 @@ class CityDroneEnv(gym.Env):
         actual_thrust = action * self.rotor_health
         self.data.ctrl[:] = actual_thrust
 
+        # Animate propeller rotations: speed proportional to sqrt(thrust)
+        if len(self.prop_qpos_indices) == 4:
+            spin_rates = self.prop_spin_dirs * np.sqrt(np.maximum(0.0, actual_thrust) / 3.5) * 80.0
+            for i in range(4):
+                self.prop_angles[i] = float((self.prop_angles[i] + spin_rates[i] * 0.02) % (2.0 * np.pi))
+                self.data.qpos[self.prop_qpos_indices[i]] = self.prop_angles[i]
+
+        # Apply realistic aerodynamic translational and rotational air damping
+        vel = self.data.qvel[0:3]
+        omega = self.data.qvel[3:6]
+        self.data.qfrc_applied[0:3] = -0.25 * vel
+        self.data.qfrc_applied[3:6] = -0.025 * omega
+
         # MuJoCo sub-steps to reach 50 Hz control rate (0.005s * 4 = 0.02s dt)
         for _ in range(4):
             mujoco.mj_step(self.model, self.data)
 
+        # Keep propeller angles synchronized in data.qpos after physics integration
+        if len(self.prop_qpos_indices) == 4:
+            for i in range(4):
+                self.data.qpos[self.prop_qpos_indices[i]] = self.prop_angles[i]
+
         obs = self._get_obs()
 
-        # Compute position error
+        # Compute position error and horizontal radius from central plaza
         curr_pos = self.data.qpos[0:3]
-        pos_err = np.linalg.norm(curr_pos - self.target_pos)
+        curr_vel = self.data.qvel[0:3]
+        r_horiz = float(np.hypot(curr_pos[0], curr_pos[1]))
+        v_horiz = float(np.hypot(curr_vel[0], curr_vel[1]))
+        z_err = float(abs(curr_pos[2] - self.target_pos[2]))
+        upright = float(np.clip(self.data.qpos[3], 0.0, 1.0))
 
-        # Reward: high reward for maintaining altitude and stability, small penalty for effort
-        z_err = abs(curr_pos[2] - self.target_pos[2])
-        upright = self.data.qpos[3]  # quat w (approx 1 when upright)
-        reward = 10.0 - 5.0 * z_err - 2.0 * pos_err + 2.0 * upright - 0.05 * np.sum(action)
+        # Reward shaping: Prioritize tight central plaza containment & altitude stability
+        r_z = np.exp(-3.0 * z_err)
+        r_pos = np.exp(-1.5 * r_horiz)
+        r_vel = np.exp(-1.0 * v_horiz)
+        penalty_geofence = 0.0
+        if r_horiz > 2.0:
+            penalty_geofence = 6.0 * ((r_horiz - 2.0) ** 2)
 
-        # Terminate if crashed to ground (z < 0.3m) or flipped completely upside down
-        terminated = bool(curr_pos[2] < 0.35)
+        reward = float(6.0 * r_z + 4.0 * r_pos + 2.0 * r_vel + 2.0 * upright - penalty_geofence - 0.01 * np.sum(action))
+
+        # Terminate if crashed to ground, hit outer plaza perimeter, or breached ceiling
+        ground_crash = bool(curr_pos[2] < 0.45)
+        building_perimeter = bool(r_horiz > 4.5)  # Enforces stay inside plaza; avoids lamps (6.8m) & trees (8.5m)
+        ceiling_breach = bool(curr_pos[2] > 9.0)
+
+        terminated = ground_crash or building_perimeter or ceiling_breach
+        if terminated and self.current_step < 1000:
+            reward -= 50.0  # Harsh penalty for any crash or boundary collision
+
         truncated = bool(self.current_step >= 1000)
 
         info = {
             "altitude": float(curr_pos[2]),
+            "r_horiz": r_horiz,
             "thrust": actual_thrust.tolist(),
             "health": self.rotor_health.tolist(),
             "fault": self.fault_type,
             "rotor": self.fault_rotor,
+            "ground_crash": ground_crash,
+            "building_perimeter": building_perimeter,
         }
 
         return obs, reward, terminated, truncated, info

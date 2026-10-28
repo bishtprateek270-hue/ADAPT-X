@@ -18,7 +18,7 @@ import argparse
 
 # Check for Isaac Lab installation
 try:
-    from omni.isaac.lab.app import AppLauncher
+    from omni.isaac.lab.app import AppLauncher  # pyrefly: ignore[missing-import]
     ISAAC_LAB_AVAILABLE = True
 except ImportError:
     ISAAC_LAB_AVAILABLE = False
@@ -45,10 +45,10 @@ def run_isaac_lab_phased_training(args_cli):
     simulation_app = app_launcher.app
 
     import torch
-    from omni.isaac.lab.envs import DirectRLEnv, DirectRLEnvCfg
-    from omni.isaac.lab.scene import InteractiveSceneCfg
-    from omni.isaac.lab.sim import SimulationCfg, PhysxCfg
-    from omni.isaac.lab.utils import configclass
+    from omni.isaac.lab.envs import DirectRLEnv, DirectRLEnvCfg  # pyrefly: ignore[missing-import]
+    from omni.isaac.lab.scene import InteractiveSceneCfg  # pyrefly: ignore[missing-import]
+    from omni.isaac.lab.sim import SimulationCfg, PhysxCfg  # pyrefly: ignore[missing-import]
+    from omni.isaac.lab.utils import configclass  # pyrefly: ignore[missing-import]
 
     print("=" * 85)
     print("       ADAPT-X: NVIDIA ISAAC LAB & ISAAC SIM PHASED RL TRAINING")
