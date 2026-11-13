@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/drone_logo.png" width="160" alt="ADAPT-X Drone Logo" />
+</p>
+
 # 🚁 ADAPT-X: Self-Healing Robotics & Dynamic Damage Adaptation
 ### Sim-to-Real Reinforcement Learning for Autonomous Quadrupeds and Urban UAVs
 
@@ -5,9 +9,9 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x%20%7C%20CUDA%2012.8-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Physics](https://img.shields.io/badge/Physics-MuJoCo%203.17-brightgreen.svg)](https://mujoco.org/)
 [![NVIDIA Omniverse](https://img.shields.io/badge/NVIDIA-Isaac%20Sim%206.2.0%20%7C%20Isaac%20Lab-76B900.svg?logo=nvidia&logoColor=white)](https://developer.nvidia.com/isaac-sim)
-[![Hardware Acceleration](https://img.shields.io/badge/Renderer-NVIDIA%20EGL%20Offscreen-76B900.svg)](https://developer.nvidia.com/)
+[![Hardware Acceleration](https://img.shields.io/badge/Renderer-NVIDIA%20EGL%20%2F%20WGL%20Offscreen-76B900.svg)](https://developer.nvidia.com/)
 [![ONNX Runtime](https://img.shields.io/badge/Deployment-ONNX%20%7C%20TorchScript-005CED.svg?logo=onnx&logoColor=white)](https://onnxruntime.ai/)
-[![Status](https://img.shields.io/badge/Status-All%205%20Phases%20Complete-success.svg)](#-project-roadmap)
+[![Status](https://img.shields.io/badge/Status-All%205%20Phases%20Complete-success.svg)](#-project-roadmap--completed-phases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -44,7 +48,7 @@ When rovers, drones, or legged robots operate in extreme, unmapped, or mission-c
 ## 🎯 Key Capabilities & Platforms
 
 ### 1. 🏙️ High-Fidelity Urban Quadcopter UAV
-* **Vibrant City Canyon Simulation:** High-rise glass skyscrapers, tree-lined avenues, asphalt crosswalks, street lamps, and public plazas ([models/city_drone_env.xml](file:///home/piet/ADAPT-X/models/city_drone_env.xml)).
+* **Vibrant City Canyon Simulation:** High-rise glass skyscrapers, tree-lined avenues, asphalt crosswalks, street lamps, and public plazas ([models/city_drone_env.xml](models/city_drone_env.xml)).
 * **Rotating Carbon-Fiber Propellers:** Visual and aerodynamic simulation of multi-rotor thrust disks with synchronized high-speed rotation.
 * **Mid-Air Rotor Loss Adaptation:** Instant recovery upon complete failure of any rotor (Front-Right, Front-Left, Rear-Right, Rear-Left). Automatically switches to bi-rotor / tri-rotor dynamic thrust allocation coupled with the DGX-trained RMA Neural Policy.
 * **Urban Geofence Field:** Active containment field preventing urban obstacle collisions (0% building crash rate).
@@ -58,7 +62,7 @@ When rovers, drones, or legged robots operate in extreme, unmapped, or mission-c
   * **Full Limb Amputation:** Complete power cutoff to a 3-joint leg with forward velocity retention.
 
 ### 3. 🌐 Zero-Install 3D Web Visualizer & Telemetry Cockpit
-* **Hardware-Accelerated Stream:** Rendered directly on GPU via headless NVIDIA EGL (800x450 in $\approx 0.21\text{ ms}$).
+* **Hardware-Accelerated Stream:** Rendered directly on GPU via headless offscreen buffers (NVIDIA EGL on Linux, native WGL on Windows: 800x450 in $\approx 0.21\text{ ms}$).
 * **Binary WebSocket Engine:** Persistent full-duplex WebSocket stream delivering zero-lag 50 FPS video synchronized with binary telemetry.
 * **Interactive Cockpit HUD:** Real-time artificial horizon attitude indicator, radar containment map, 4-rotor RPM gauges, camera mode switcher (Chase, FPV Gimbal, Orbit, Top-Down), and real-time failure injection buttons.
 
@@ -75,40 +79,35 @@ When rovers, drones, or legged robots operate in extreme, unmapped, or mission-c
 
 ## ⚡ 1-Click Quick Start
 
-### Option A: Desktop Shortcut (One Click)
-Double-click the **ADAPT-X Drone Simulator** icon on your Desktop. It will launch the terminal process, start the MuJoCo simulation server, and automatically open your web browser to the interactive 3D cockpit.
+### Option A: Web 3D Simulation Cockpit (Browser - Zero Install)
 
-### Option B: Terminal Launcher
+#### Linux / Ubuntu:
 ```bash
-# Clone the repository
-git clone https://github.com/bishtprateek270-hue/ADAPT-X.git
-cd ADAPT-X
-
-# 1-Click Unified Full-Stack Launcher (Frontend + Backend)
+# 1-Click Unified Full-Stack Launcher (Frontend + Backend + Browser)
 ./launch_adaptx.sh
+
+# Or launch background web simulation service:
+./run_web_simulation.sh
 ```
-* **Web Cockpit:** `http://localhost:8080`
+
+#### Windows / macOS / Cross-Platform:
+```bash
+# Run the streaming visualizer server directly:
+python web_drone_viewer.py
+```
+
+* **Web Cockpit:** [http://localhost:8080](http://localhost:8080)
 * **WebSocket Stream:** `ws://localhost:8081`
-* **Network Access:** `http://<HOST_IP>:8080` (accessible from laptops, tablets, or phones on the local network)
+* **Local Network Access:** `http://<HOST_IP>:8080` (accessible from laptops, tablets, or phones on the same network)
 
 ---
 
-## 🎮 Interactive Visualizations & Modes
+### Option B: Desktop Shortcut (Ubuntu GNOME)
+Double-click the **ADAPT-X Drone Simulator** icon on your Desktop. It automatically spins up the MuJoCo simulation server, manages port bindings, and launches your default browser directly into the interactive 3D cockpit.
 
-### 1. 3D Web Cockpit Controls
-Once `http://localhost:8080` is open:
-* **Camera Views:**
-  * `CHASE`: Dynamic third-person tracking camera behind the drone.
-  * `FPV GIMBAL`: First-person forward-facing cockpit perspective.
-  * `ORBIT`: 360-degree rotating cinematic camera.
-  * `TOP-DOWN`: Orthographic satellite/tactical aerial view.
-* **Damage Injection:**
-  * Trigger mid-air failure of `FRONT-RIGHT (FR)`, `FRONT-LEFT (FL)`, `REAR-RIGHT (RR)`, or `REAR-LEFT (RL)` motors.
-  * Click `RESTORE NOMINAL` to bring all 4 motors back online.
-* **Flight Modes:** `CRUISE` (lemniscate urban patrol), `ORBIT` (central plaza circular orbit), `HOVER / WAYPOINTS`.
-* **Controller Switch:** Toggle between Dynamic Allocation Baseline and DGX RMA Neural Policy.
+---
 
-### 2. Standalone Native 3D Simulation (Local MuJoCo Window)
+### Option C: Standalone Native 3D Simulation (Local MuJoCo Window)
 ```bash
 # City Drone Flight with mid-air Front-Right rotor failure at step 150:
 python fly_drone.py --damage dead_motor --rotor fr
@@ -123,7 +122,9 @@ python visualize_3d.py --damage amputated_leg --leg fr
 python visualize_3d.py --damage locked_joint --leg rl
 ```
 
-### 3. Edge Deployment Runner (ONNX / TorchScript)
+---
+
+### Option D: Edge Deployment Runner (ONNX / TorchScript)
 Simulate real embedded hardware execution with zero PyTorch runtime dependencies:
 ```bash
 # Run ONNX production policy with simulated limb amputation:
@@ -131,7 +132,27 @@ python deploy.py --model deployments/adaptx_policy.onnx --damage amputated_leg -
 
 # Run TorchScript policy with locked joint:
 python deploy.py --model deployments/adaptx_policy.torchscript.pt --damage locked_joint --leg rl
+
+# Run Heavy 3.3M Transformer UAV policy:
+python deploy.py --model deployments/adaptx_heavy_drone.onnx
 ```
+
+---
+
+## 🎮 Interactive Visualizations & Modes
+
+### 1. 3D Web Cockpit Controls
+Once [http://localhost:8080](http://localhost:8080) is open:
+* **Camera Views:**
+  * `CHASE`: Dynamic third-person tracking camera behind the drone.
+  * `FPV GIMBAL`: First-person forward-facing cockpit perspective.
+  * `ORBIT`: 360-degree rotating cinematic camera.
+  * `TOP-DOWN`: Orthographic satellite/tactical aerial view.
+* **Damage Injection:**
+  * Trigger mid-air failure of `FRONT-RIGHT (FR)`, `FRONT-LEFT (FL)`, `REAR-RIGHT (RR)`, or `REAR-LEFT (RL)` motors.
+  * Click `RESTORE NOMINAL` to bring all 4 motors back online.
+* **Flight Modes:** `CRUISE` (lemniscate urban patrol), `ORBIT` (central plaza circular orbit), `HOVER / WAYPOINTS`.
+* **Controller Switch:** Toggle between Dynamic Allocation Baseline and DGX RMA Neural Policy.
 
 ---
 
@@ -177,11 +198,11 @@ When motor $i$ fails ($f_i = 0$), the online controller dynamically projects req
 | **Throughput** | **$16,313\text{ Hz}$** | $50\text{ Hz}$ | **$326\times$ Bandwidth** | ✅ Passed |
 | **PyTorch vs ONNX Parity** | **$3.58 \times 10^{-7}$** | $< 10^{-4}$ | Micro-precision matched | ✅ Passed |
 
-### Web Visualizer Rendering Metrics (NVIDIA EGL):
+### Web Visualizer Rendering Metrics:
 | Component | Metric | Performance |
 | :--- | :--- | :--- |
-| **Offscreen Rendering** | MuJoCo EGL 800x450 | **$0.21\text{ ms}$ / frame** |
-| **WebSocket Delivery** | Binary Frame + Telemetry | **50 - 60 FPS (Zero Drop)** |
+| **Offscreen Rendering** | MuJoCo GPU Offscreen (EGL/WGL) 800x450 | **$0.21\text{ ms}$ / frame** |
+| **WebSocket Delivery** | Binary Frame + Synchronized Telemetry | **50 - 60 FPS (Zero Drop)** |
 | **End-to-End Latency** | Simulation Step to Browser Canvas | **$< 12\text{ ms}$** |
 | **Collision Rate** | Geofence Containment Field | **0.00% (Crash-Proof)** |
 
@@ -190,8 +211,8 @@ When motor $i$ fails ($f_i = 0$), the online controller dynamically projects req
 ## 🗺️ Project Roadmap & Completed Phases
 
 - [x] **Phase 1: Baseline Nominal Locomotion & Flight**
-  - [x] 12-DoF Quadruped model ([quadruped.xml](file:///home/piet/ADAPT-X/models/quadruped.xml)) & Urban Drone model ([city_drone_env.xml](file:///home/piet/ADAPT-X/models/city_drone_env.xml))
-  - [x] Custom Gymnasium environments ([quadruped_env.py](file:///home/piet/ADAPT-X/envs/quadruped_env.py), [drone_env.py](file:///home/piet/ADAPT-X/envs/drone_env.py))
+  - [x] 12-DoF Quadruped model ([models/quadruped.xml](models/quadruped.xml)) & Urban Drone model ([models/city_drone_env.xml](models/city_drone_env.xml))
+  - [x] Custom Gymnasium environments ([envs/quadruped_env.py](envs/quadruped_env.py), [envs/drone_env.py](envs/drone_env.py))
   - [x] PPO trainer with Generalized Advantage Estimation (GAE)
 - [x] **Phase 2: Comprehensive Failure Space & Damage Modeling**
   - [x] Dead motor mode (limp joint / zero thrust)
@@ -217,20 +238,25 @@ When motor $i$ fails ($f_i = 0$), the online controller dynamically projects req
 
 ## ⚡ High-Performance Training (DGX Spark & Isaac Sim)
 
-For full distributed training procedures, refer to [DGX_TRAINING_GUIDE.md](file:///home/piet/ADAPT-X/DGX_TRAINING_GUIDE.md).
+For complete distributed cluster setup and execution guidelines, refer to [DGX_TRAINING_GUIDE.md](DGX_TRAINING_GUIDE.md).
 
 ```bash
-# 1-Click launcher for all 5 phases on DGX Spark (Blackwell GB10):
-./run_dgx_spark_phases.sh quadruped all
-
-# DGX Spark Heavy Deep RL Model (3.3M parameters, Temporal Transformer + ResNet):
+# 1. DGX Spark Heavy Deep RL Model (3.3M parameters, Temporal Transformer + ResNet):
 ./run_heavy_dgx_spark.sh all 1.0 32
+# Or directly via Python:
+python train_heavy_dgx.py --phase all
 
-# Slurm batch submission on supercomputing clusters:
-sbatch submit_slurm_dgx.sh
+# 2. DGX Spark 5-Phase Curriculum Trainer:
+./run_dgx_spark_phases.sh quadruped all
+# Or directly via Python:
+python train_dgx_phases.py --robot quadruped --phase all
 
-# NVIDIA Isaac Sim 6.2.0 Photorealistic Omniverse GUI:
+# 3. NVIDIA Isaac Lab / Isaac Sim Omniverse GUI:
+./run_isaac_drone.sh
 ./run_isaac_sim_gui.sh
+
+# 4. Slurm batch submission on supercomputing clusters:
+sbatch submit_slurm_dgx.sh
 ```
 
 ---
@@ -239,12 +265,13 @@ sbatch submit_slurm_dgx.sh
 
 ```
 ADAPT-X/
-├── assets/                          # Drone logo assets & icon themes
+├── assets/                          # Drone logo assets & icon generation
 │   ├── drone_logo.png               # High-res 512x512 desktop icon
 │   ├── drone_logo.svg               # Scalable vector graphics icon
 │   └── generate_drone_logo.py       # Programmatic icon generator
 ├── agents/                          # Reinforcement Learning policy architectures
 │   ├── adaptive_ppo.py              # RMA Temporal History Encoder & Adaptive Policy
+│   ├── heavy_adaptive_ppo.py        # 3.3M Param Transformer & Deep ResNet Actor-Critic
 │   └── ppo.py                       # Baseline Gaussian PPO Actor-Critic
 ├── checkpoints/                     # Model weights & training checkpoints
 │   ├── dgx_spark/                   # DGX Blackwell trained phase checkpoints
@@ -252,10 +279,14 @@ ADAPT-X/
 │   └── phase3/                      # Best adaptive policy checkpoints
 ├── configs/                         # YAML configuration profiles
 │   ├── phase2_damage_config.yaml    # Fault injection settings
-│   └── phase3_adaptive_config.yaml  # RMA encoder hyper-parameters
+│   ├── phase3_adaptive_config.yaml  # RMA encoder hyper-parameters
+│   ├── phase4_curriculum_config.yaml# Staged curriculum training settings
+│   └── training_config.yaml         # Base environment & PPO parameters
 ├── deployments/                     # Production zero-dependency deployment models
 │   ├── adaptx_policy.onnx           # Exported Quadruped ONNX policy
 │   ├── adaptx_policy.torchscript.pt # Exported Quadruped TorchScript policy
+│   ├── adaptx_dgx_spark_policy.onnx # DGX Blackwell 5-Phase ONNX policy
+│   ├── adaptx_heavy_dgx_spark.onnx  # 3.3M Parameter Transformer ONNX model
 │   ├── adaptx_heavy_drone.onnx      # Exported 3.3M UAV ONNX policy
 │   └── adaptx_isaac_drone_policy.onnx # Exported Isaac Sim drone policy
 ├── envs/                            # Gymnasium physics environments
@@ -263,17 +294,32 @@ ADAPT-X/
 │   ├── quadruped_env.py             # 12-DoF Quadruped MDP & Failure Modes
 │   └── sim2real_utils.py            # Noise, latency, & domain randomization
 ├── isaac_lab/                       # NVIDIA Isaac Sim 6.2.0 Omniverse suite
+│   ├── isaac_lab_phases.sh          # Phased Isaac Lab shell launcher
 │   ├── train_isaac_drone.py         # Multi-GPU Isaac Sim UAV trainer
+│   ├── train_isaac_lab.py           # Core Isaac Lab environment runner
 │   └── train_isaac_lab_phases.py    # Phased Isaac Lab quadruped trainer
 ├── models/                          # MuJoCo XML physical models & scenes
 │   ├── city_drone_env.xml           # 3D City canyon, skyscrapers, and drone UAV
+│   ├── disaster_arena.xml           # Obstacle arena for quadruped stress testing
 │   └── quadruped.xml                # 12-DoF quadruped kinematics & joints
 ├── deploy.py                        # Standalone edge deployment benchmark runner
 ├── export.py                        # Checkpoint to ONNX/TorchScript exporter
 ├── fly_drone.py                     # Native 3D city drone interactive simulator
 ├── launch_adaptx.sh                 # 1-Click unified launcher (Frontend + Backend)
-├── run_web_simulation.sh            # Web visualizer shell launcher
+├── run_dgx.sh                       # Local DGX runner script
+├── run_dgx_spark_phases.sh          # 5-Phase DGX Spark training script
+├── run_heavy_dgx_spark.sh           # 3.3M Transformer DGX training script
+├── run_isaac_drone.sh               # Isaac Sim drone training launcher
 ├── run_isaac_sim_gui.sh             # Docker launcher for Isaac Sim Omniverse GUI
+├── run_web_simulation.sh            # Web visualizer shell launcher
+├── submit_slurm_dgx.sh              # Slurm batch job configuration for clusters
+├── train.py                         # Phase 1 & 2 baseline trainer
+├── train_adaptive.py                # Phase 3 RMA adaptive policy trainer
+├── train_curriculum.py              # Phase 4 staged curriculum trainer
+├── train_dgx.py                     # High-throughput vector trainer
+├── train_dgx_phases.py              # 5-Phase DGX Spark fast curriculum trainer
+├── train_drone.py                   # Drone UAV PPO trainer
+├── train_heavy_dgx.py               # 3.3M Transformer Deep RL DGX trainer
 ├── visualize_3d.py                  # Unified 3D viewer for Quadruped & Drone
 ├── web_drone_viewer.py              # Unified simulation backend & WebSocket cockpit
 └── requirements.txt                 # Project Python dependencies
@@ -290,7 +336,7 @@ cd ADAPT-X
 
 # Create and activate virtual environment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt

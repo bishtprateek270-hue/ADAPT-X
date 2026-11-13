@@ -61,7 +61,7 @@ Divided into 5 distinct training curriculum phases with automatic checkpoint cha
 
 ---
 
-#### 🟣 Option B: NVIDIA Isaac Lab & Isaac Sim Phased RL Suite
+#### 🟣 Option C: NVIDIA Isaac Lab & Isaac Sim Phased RL Suite
 If your cluster runs **NVIDIA Omniverse / Isaac Sim & Isaac Lab**:
 ```bash
 # Launch with Isaac Lab launcher script:
@@ -75,7 +75,7 @@ If your cluster runs **NVIDIA Omniverse / Isaac Sim & Isaac Lab**:
 
 ---
 
-#### 🔵 Option C: Slurm Batch Scheduler (DGX SuperPOD / University Clusters)
+#### 🔵 Option D: Slurm Batch Scheduler (DGX SuperPOD / University Clusters)
 If your DGX cluster uses Slurm for job scheduling:
 ```bash
 # Submit batch job:

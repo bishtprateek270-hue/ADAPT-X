@@ -14,8 +14,9 @@ Equipped with:
 import os
 import sys
 
-# Force headless hardware-accelerated NVIDIA EGL rendering
-os.environ["MUJOCO_GL"] = "egl"
+# Hardware-accelerated NVIDIA EGL rendering on Linux
+if sys.platform != "win32" and "MUJOCO_GL" not in os.environ:
+    os.environ["MUJOCO_GL"] = "egl"
 
 # Auto-switch to virtual environment if needed
 venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "bin", "python")
