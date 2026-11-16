@@ -113,14 +113,15 @@ class WebSocketBroadcaster:
 
 
 class SimulationWorker:
-    def __init__(self, target_altitude=4.5):
+    def __init__(self, target_altitude=4.5, width=1280, height=720, jpeg_quality=85):
         self.target_altitude = target_altitude
         self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude))
         self.env.reset_adaptive()
 
-        # 800x450 renders in 0.21ms on NVIDIA EGL (vs 18.8ms at 960x540)
-        self.width = 800
-        self.height = 450
+        # Configurable resolution: 720p (1280x720), 1080p (1920x1080), or 450p (800x450)
+        self.width = width
+        self.height = height
+        self.jpeg_quality = jpeg_quality
         self.renderer = None
 
         self.camera = mujoco.MjvCamera()
@@ -389,9 +390,9 @@ class SimulationWorker:
                 self.renderer.update_scene(self.env.data, camera=self.camera)
                 pixels = self.renderer.render()
 
-                # Fast OpenCV JPEG compression (0.97 ms)
+                # Fast OpenCV JPEG compression
                 bgr = cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR)
-                _, enc_buf = cv2.imencode('.jpg', bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _, enc_buf = cv2.imencode('.jpg', bgr, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
                 jpeg_bytes = enc_buf.tobytes()
 
                 # Update telemetry
@@ -420,6 +421,7 @@ class SimulationWorker:
                     "containment": containment_label,
                     "status_text": status_str,
                     "sim_fps": round(current_fps, 1),
+                    "resolution": f"{self.width}x{self.height}",
                     "step": self.step_count
                 }
 
@@ -831,7 +833,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <main>
   <!-- Main 3D Canvas Stage -->
   <div class="stage-container" id="stage-wrapper">
-    <canvas id="stream-canvas" width="800" height="450"></canvas>
+    <canvas id="stream-canvas" width="1280" height="720"></canvas>
     
     <div class="hud-top">
       <div class="hud-group">
@@ -839,6 +841,7 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="hud-chip" id="hud-stream-mode">⚡ WEBSOCKET 50 FPS (ZERO LAG)</div>
       </div>
       <div class="hud-group">
+        <div class="hud-chip">🖥️ <span id="hud-res">1280×720 (720p HD)</span></div>
         <div class="hud-chip">
           CLIENT: <span class="hud-fps-val" id="hud-client-fps">50 FPS</span>
         </div>
@@ -1021,6 +1024,10 @@ function updateHUD(data) {
 
   // Sim FPS
   document.getElementById('hud-sim-fps').innerText = data.sim_fps.toFixed(1) + ' FPS';
+  if (data.resolution) {
+    const resEl = document.getElementById('hud-res');
+    if (resEl) resEl.innerText = data.resolution;
+  }
 }
 
 // WebSocket Connection Management
@@ -1059,13 +1066,21 @@ function connectWebSocket() {
         const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
         if (window.createImageBitmap) {
           const bmp = await createImageBitmap(blob);
-          ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+          if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+            canvas.width = bmp.width;
+            canvas.height = bmp.height;
+          }
+          ctx.drawImage(bmp, 0, 0);
           bmp.close();
         } else {
           const url = URL.createObjectURL(blob);
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            if (canvas.width !== img.width || canvas.height !== img.height) {
+              canvas.width = img.width;
+              canvas.height = img.height;
+            }
+            ctx.drawImage(img, 0, 0);
             URL.revokeObjectURL(url);
           };
           img.src = url;
@@ -1313,9 +1328,22 @@ def main():
     parser.add_argument("--port", type=int, default=8080, help="Web server port (default: 8080)")
     parser.add_argument("--ws-port", type=int, default=8081, help="WebSocket streaming port (default: 8081)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Web server host (default: 0.0.0.0)")
+    parser.add_argument("--res", "--resolution", type=str, default="720p", choices=["450p", "720p", "1080p"], help="Stream resolution: 450p (800x450), 720p (1280x720 HD, default), 1080p (1920x1080 Full HD)")
+    parser.add_argument("--width", type=int, default=None, help="Custom stream width (e.g. 1280)")
+    parser.add_argument("--height", type=int, default=None, help="Custom stream height (e.g. 720)")
+    parser.add_argument("--quality", type=int, default=85, help="JPEG compression quality 1-100 (default: 85)")
     args = parser.parse_args()
 
-    worker = SimulationWorker()
+    res_map = {
+        "450p": (800, 450),
+        "720p": (1280, 720),
+        "1080p": (1920, 1080)
+    }
+    width, height = res_map.get(args.res, (1280, 720))
+    if args.width and args.height:
+        width, height = args.width, args.height
+
+    worker = SimulationWorker(width=width, height=height, jpeg_quality=args.quality)
     worker.ws_port = args.ws_port
 
     # Start WebSocket Broadcaster on port 8081
@@ -1335,6 +1363,7 @@ def main():
     print("=" * 75)
     print(f" Web Server Running : http://0.0.0.0:{args.port}")
     print(f" WebSocket Stream   : ws://0.0.0.0:{args.ws_port}")
+    print(f" Resolution         : {width}x{height} ({args.res.upper() if args.res else 'HD'}) @ {args.quality}% JPEG")
     print(f" Open on Laptop     : http://10.42.0.44:{args.port}")
     print(f" Localhost URL      : http://localhost:{args.port}")
     print(" Delivery Engine    : WebSocket Persistent Binary Protocol (Zero-Lag 50 FPS)")

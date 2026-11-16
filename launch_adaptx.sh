@@ -48,9 +48,29 @@ echo -e "${YELLOW}[→] Terminating any stale ADAPT-X viewer instances...${NC}"
 pkill -f "web_drone_viewer.py" 2>/dev/null || true
 sleep 0.5
 
-# Detect free ports dynamically (avoiding collision with Docker or background services)
-PREF_HTTP="${1:-8080}"
-PREF_WS="${2:-8081}"
+# Parse arguments intelligently (ports and resolution)
+PREF_HTTP=8080
+PREF_WS=8081
+RES="720p"
+SET_HTTP=""
+
+for arg in "$@"; do
+    case "$arg" in
+        1080p|1080|fhd|FHD) RES="1080p" ;;
+        720p|720|hd|HD) RES="720p" ;;
+        450p|450|sd|SD) RES="450p" ;;
+        *)
+            if [[ "$arg" =~ ^[0-9]+$ ]]; then
+                if [ -z "$SET_HTTP" ]; then
+                    PREF_HTTP="$arg"
+                    SET_HTTP=1
+                else
+                    PREF_WS="$arg"
+                fi
+            fi
+            ;;
+    esac
+done
 
 HTTP_PORT=$("$VENV_PYTHON" -c "
 import socket
@@ -97,6 +117,7 @@ fi
 echo -e " Hardware Engine   : ${CYAN}NVIDIA EGL Hardware Accelerated Rendering${NC}"
 echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Simulation & Geofence Containment)${NC}"
 echo -e " Neural Policy     : ${CYAN}ADAPT-X Heavy Drone ONNX (DGX Spark Trained)${NC}"
+echo -e " Stream Resolution : ${GREEN}${RES}${NC} (HD Quality)"
 echo -e " Web Frontend      : ${GREEN}http://localhost:${HTTP_PORT}${NC}"
 echo -e " Network Access    : ${CYAN}http://${HOST_IP}:${HTTP_PORT}${NC}"
 echo -e " WebSocket Stream  : ${CYAN}ws://localhost:${WS_PORT}${NC}"
@@ -108,7 +129,7 @@ export PYTHONUNBUFFERED=1
 
 # Start the unified backend & frontend server in background
 echo -e "${GREEN}[→] Launching Simulation Backend & Web Server...${NC}"
-"$VENV_PYTHON" "$SCRIPT_DIR/web_drone_viewer.py" --port "$HTTP_PORT" --ws-port "$WS_PORT" --host 0.0.0.0 2>&1 | tee "$LOG_FILE" &
+"$VENV_PYTHON" "$SCRIPT_DIR/web_drone_viewer.py" --port "$HTTP_PORT" --ws-port "$WS_PORT" --res "$RES" --host 0.0.0.0 2>&1 | tee "$LOG_FILE" &
 SERVER_PID=$!
 
 # Trap signals for graceful cleanup

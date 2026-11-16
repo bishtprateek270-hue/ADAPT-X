@@ -3,7 +3,7 @@
   <option timestep="0.005" iterations="4" solver="Newton" gravity="0 0 -9.81" density="1.2" viscosity="0.000018"/>
 
   <visual>
-    <global offwidth="1280" offheight="720"/>
+    <global offwidth="1920" offheight="1080"/>
     <quality shadowsize="2048"/>
     <headlight ambient="0.45 0.45 0.45" diffuse="0.85 0.85 0.85" specular="0.35 0.35 0.35"/>
   </visual>
