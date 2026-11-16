@@ -1201,7 +1201,9 @@ class StreamingHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(HTML_PAGE.encode("utf-8"))
+            ws_port = getattr(self.worker, "ws_port", 8081)
+            page = HTML_PAGE.replace("const wsPort = 8081;", f"const wsPort = {ws_port};")
+            self.wfile.write(page.encode("utf-8"))
 
         elif path == "/frame.jpg":
             # Fast single-frame fallback endpoint with zero-latency telemetry header
@@ -1314,6 +1316,7 @@ def main():
     args = parser.parse_args()
 
     worker = SimulationWorker()
+    worker.ws_port = args.ws_port
 
     # Start WebSocket Broadcaster on port 8081
     broadcaster = WebSocketBroadcaster(port=args.ws_port, worker=worker)

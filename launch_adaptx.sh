@@ -9,10 +9,8 @@ set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-HTTP_PORT="${1:-8080}"
-WS_PORT="${2:-8081}"
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-[ -z "$HOST_IP" ] && HOST_IP="127.0.0.1"
+mkdir -p "$SCRIPT_DIR/logs"
+LOG_FILE="$SCRIPT_DIR/logs/launcher.log"
 
 # ANSI Colors
 CYAN="\033[1;36m"
@@ -37,13 +35,6 @@ echo -e "${NC}"
 echo -e "${BOLD}======================================================================${NC}"
 echo -e " ${GREEN}●${NC} Starting ADAPT-X 3D Drone Flight Simulation & Telemetry System"
 echo -e "${BOLD}======================================================================${NC}"
-echo -e " Hardware Engine   : ${CYAN}NVIDIA EGL Hardware Accelerated Rendering${NC}"
-echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Simulation & Geofence Containment)${NC}"
-echo -e " Neural Policy     : ${CYAN}ADAPT-X Heavy Drone ONNX (DGX Spark Trained)${NC}"
-echo -e " Web Frontend      : ${CYAN}http://localhost:${HTTP_PORT}${NC}"
-echo -e " Network Access    : ${CYAN}http://${HOST_IP}:${HTTP_PORT}${NC}"
-echo -e " WebSocket Stream  : ${CYAN}ws://localhost:${WS_PORT}${NC}"
-echo -e "${BOLD}======================================================================${NC}"
 
 # Locate Virtual Environment Python
 VENV_PYTHON="${SCRIPT_DIR}/.venv/bin/python"
@@ -52,12 +43,64 @@ if [ ! -x "$VENV_PYTHON" ]; then
     VENV_PYTHON="$(which python3)"
 fi
 
-# Ensure previous instances on these ports are cleanly terminated
-echo -e "${YELLOW}[→] Checking and freeing ports ${HTTP_PORT} and ${WS_PORT}...${NC}"
-fuser -k "${HTTP_PORT}/tcp" 2>/dev/null || true
-fuser -k "${WS_PORT}/tcp" 2>/dev/null || true
-pkill -f "web_drone_viewer.py --port ${HTTP_PORT}" 2>/dev/null || true
-sleep 0.4
+# Clean up any previously running instance of web_drone_viewer
+echo -e "${YELLOW}[→] Terminating any stale ADAPT-X viewer instances...${NC}"
+pkill -f "web_drone_viewer.py" 2>/dev/null || true
+sleep 0.5
+
+# Detect free ports dynamically (avoiding collision with Docker or background services)
+PREF_HTTP="${1:-8080}"
+PREF_WS="${2:-8081}"
+
+HTTP_PORT=$("$VENV_PYTHON" -c "
+import socket
+pref = int('$PREF_HTTP')
+candidates = [pref] + list(range(8082, 8100)) + list(range(8880, 8900))
+for p in candidates:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(('0.0.0.0', p))
+        s.close()
+        print(p)
+        break
+    except OSError:
+        pass
+")
+
+WS_PORT=$("$VENV_PYTHON" -c "
+import socket
+pref = int('$PREF_WS')
+avoid = int('$HTTP_PORT')
+candidates = [pref] + list(range(8081, 8100)) + list(range(8880, 8900))
+for p in candidates:
+    if p == avoid:
+        continue
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(('0.0.0.0', p))
+        s.close()
+        print(p)
+        break
+    except OSError:
+        pass
+")
+
+HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$HOST_IP" ] && HOST_IP="127.0.0.1"
+
+if [ "$HTTP_PORT" != "$PREF_HTTP" ]; then
+    echo -e "${YELLOW}[i] Port $PREF_HTTP is occupied (e.g. by Docker). Automatically selected free port: ${GREEN}${HTTP_PORT}${NC}"
+fi
+
+echo -e " Hardware Engine   : ${CYAN}NVIDIA EGL Hardware Accelerated Rendering${NC}"
+echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Simulation & Geofence Containment)${NC}"
+echo -e " Neural Policy     : ${CYAN}ADAPT-X Heavy Drone ONNX (DGX Spark Trained)${NC}"
+echo -e " Web Frontend      : ${GREEN}http://localhost:${HTTP_PORT}${NC}"
+echo -e " Network Access    : ${CYAN}http://${HOST_IP}:${HTTP_PORT}${NC}"
+echo -e " WebSocket Stream  : ${CYAN}ws://localhost:${WS_PORT}${NC}"
+echo -e "${BOLD}======================================================================${NC}"
 
 # Set environment
 export MUJOCO_GL=egl
@@ -65,7 +108,7 @@ export PYTHONUNBUFFERED=1
 
 # Start the unified backend & frontend server in background
 echo -e "${GREEN}[→] Launching Simulation Backend & Web Server...${NC}"
-"$VENV_PYTHON" "$SCRIPT_DIR/web_drone_viewer.py" --port "$HTTP_PORT" --ws-port "$WS_PORT" --host 0.0.0.0 &
+"$VENV_PYTHON" "$SCRIPT_DIR/web_drone_viewer.py" --port "$HTTP_PORT" --ws-port "$WS_PORT" --host 0.0.0.0 2>&1 | tee "$LOG_FILE" &
 SERVER_PID=$!
 
 # Trap signals for graceful cleanup
@@ -79,9 +122,7 @@ cleanup() {
     echo -e "${YELLOW}[!] Shutting down ADAPT-X Server (PID: ${SERVER_PID})...${NC}"
     kill -TERM "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
-    fuser -k "${HTTP_PORT}/tcp" 2>/dev/null || true
-    fuser -k "${WS_PORT}/tcp" 2>/dev/null || true
-    echo -e "${GREEN}[✓] Shutdown clean. Ports ${HTTP_PORT} and ${WS_PORT} released.${NC}"
+    echo -e "${GREEN}[✓] Shutdown clean. Ports released.${NC}"
     exit 0
 }
 trap cleanup SIGINT SIGTERM EXIT
@@ -89,8 +130,13 @@ trap cleanup SIGINT SIGTERM EXIT
 # Health check: Wait until web server responds
 echo -e "${CYAN}[→] Awaiting server readiness on port ${HTTP_PORT}...${NC}"
 READY=0
-for i in {1..35}; do
-    if curl -s -f "http://127.0.0.1:${HTTP_PORT}/" >/dev/null 2>&1; then
+for i in {1..40}; do
+    # Check if process is still running
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo -e "${RED}[✗] Server process exited unexpectedly! See error log above.${NC}"
+        break
+    fi
+    if curl -s -f "http://127.0.0.1:${HTTP_PORT}/telemetry" >/dev/null 2>&1 || curl -s -f "http://127.0.0.1:${HTTP_PORT}/" >/dev/null 2>&1; then
         READY=1
         break
     fi
@@ -106,7 +152,7 @@ if [ $READY -eq 1 ]; then
         [ ! -f "$ICON_PATH" ] && ICON_PATH="adaptx-drone"
         notify-send -i "$ICON_PATH" \
             "ADAPT-X Drone Simulation" \
-            "System is LIVE! Opening Cockpit at http://localhost:${HTTP_PORT}" 2>/dev/null || true
+            "Cockpit is LIVE at http://localhost:${HTTP_PORT}" 2>/dev/null || true
     fi
 
     # Automatically open default browser
@@ -118,12 +164,17 @@ if [ $READY -eq 1 ]; then
     elif which firefox >/dev/null 2>&1; then
         firefox "http://localhost:${HTTP_PORT}" 2>/dev/null &
     fi
+
+    echo -e "\n${BOLD}${GREEN}✔ ADAPT-X is running in live stream mode.${NC}"
+    echo -e "${CYAN}Press Ctrl+C in this terminal at any time to stop the simulation.${NC}\n"
+
+    # Keep script running attached to the server process
+    wait "$SERVER_PID"
 else
-    echo -e "${RED}[✗] Server failed to respond within timeout. Check logs above.${NC}"
+    echo -e "${RED}[✗] Failed to initialize ADAPT-X simulation server.${NC}"
+    echo -e "Review logs in: ${LOG_FILE}"
+    echo ""
+    read -n 1 -s -r -p "Press any key to close..."
+    echo ""
+    exit 1
 fi
-
-echo -e "\n${BOLD}${GREEN}✔ ADAPT-X is running in live stream mode.${NC}"
-echo -e "${CYAN}Press Ctrl+C in this terminal at any time to stop the simulation.${NC}\n"
-
-# Keep script running attached to the server process
-wait "$SERVER_PID"
