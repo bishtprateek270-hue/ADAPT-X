@@ -115,7 +115,8 @@ if [ "$HTTP_PORT" != "$PREF_HTTP" ]; then
 fi
 
 echo -e " Hardware Engine   : ${CYAN}NVIDIA EGL Hardware Accelerated Rendering${NC}"
-echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Simulation & Geofence Containment)${NC}"
+echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Urban City Dynamics)${NC}"
+echo -e " Trajectory Engine : ${GREEN}5 Dynamic City Modes (Avenue Patrol, Skyline Survey, Boulevard Dash)${NC}"
 echo -e " Neural Policy     : ${CYAN}ADAPT-X Heavy Drone ONNX (DGX Spark Trained)${NC}"
 echo -e " Stream Resolution : ${GREEN}${RES}${NC} (HD Quality)"
 echo -e " Web Frontend      : ${GREEN}http://localhost:${HTTP_PORT}${NC}"
