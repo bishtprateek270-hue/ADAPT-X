@@ -52,7 +52,7 @@ def run_drone_simulation(
         print(f" Injected Fail : NONE (Continuous Stable Flight - Zero Collisions)")
     print("=" * 75)
 
-    env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude))
+    env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=28.0, max_altitude=16.0)
     obs, _ = env.reset()
 
     l = env.arm_length
@@ -74,15 +74,31 @@ def run_drone_simulation(
         w, x_q, y_q, z_q = env.data.qpos[3:7]
         wx, wy, wz = env.data.qvel[3:6]
 
-        # Target trajectory based on mode (stays safely within 2.5m plaza radius)
+        # Dynamic City Trajectories
         if mode == "cruise":
-            # Smooth 2-meter aerial orbit around the central plaza
-            x_des = 2.0 * np.cos(0.35 * t)
-            y_des = 2.0 * np.sin(0.35 * t)
-            z_des = target_altitude + 0.15 * np.sin(0.5 * t)
+            # Avenue Patrol: Figure-8 sweep traversing avenues between skyscrapers
+            omega_x = 0.18
+            omega_y = 0.36
+            x_des = 13.5 * np.sin(omega_x * t)
+            y_des = 10.5 * np.sin(omega_y * t)
+            z_des = target_altitude + 0.8 * np.sin(0.35 * t)
+        elif mode == "skyline":
+            # Skyline Survey: High-altitude perimeter sweep level with skyscraper roofs
+            omega = 0.14
+            x_des = 11.5 * np.cos(omega * t)
+            y_des = 11.5 * np.sin(omega * t)
+            z_des = 8.2 + 1.2 * np.sin(0.28 * t)
+        elif mode == "sprint":
+            # Boulevard Dash: High-speed boulevard sprint with banked turns
+            omega = 0.22
+            x_des = 14.5 * np.sin(omega * t)
+            y_des = 1.2 * np.sin(2.0 * omega * t)
+            z_des = 4.6 + 0.5 * np.cos(omega * t)
         elif mode == "orbit":
-            x_des = 2.5 * np.cos(0.25 * t)
-            y_des = 2.5 * np.sin(0.25 * t)
+            # Plaza Orbit: Broad perimeter sweep around the grand plaza
+            omega = 0.22
+            x_des = 5.2 * np.cos(omega * t)
+            y_des = 5.2 * np.sin(omega * t)
             z_des = target_altitude
         else:
             # Stationary precision hover
@@ -94,14 +110,14 @@ def run_drone_simulation(
         pitch_des = np.clip( (kp_pos * ex - kd_pos * curr_vel[0]), -0.12, 0.12)
         roll_des  = np.clip(-(kp_pos * ey - kd_pos * curr_vel[1]), -0.12, 0.12)
 
-        # Active Geofence boundary safeguard (keeps drone strictly within plaza)
+        # Active Geofence boundary safeguard (keeps drone strictly within urban arena)
         r_horiz = np.hypot(curr_pos[0], curr_pos[1])
-        if r_horiz > 3.0:
-            pen = r_horiz - 3.0
+        if r_horiz > 20.0:
+            pen = r_horiz - 20.0
             rep_x = -(curr_pos[0] / r_horiz) * pen * 0.25
             rep_y = -(curr_pos[1] / r_horiz) * pen * 0.25
-            pitch_des = np.clip(pitch_des + rep_x, -0.15, 0.15)
-            roll_des  = np.clip(roll_des - rep_y, -0.15, 0.15)
+            pitch_des = np.clip(pitch_des + rep_x, -0.25, 0.25)
+            roll_des  = np.clip(roll_des - rep_y, -0.25, 0.25)
 
         # Body-frame gravity vector:
         gx = 2.0 * (x_q * z_q - w * y_q)
@@ -273,7 +289,7 @@ def run_drone_simulation(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ADAPT-X 3D City Drone Simulator")
-    parser.add_argument("--mode", type=str, default="cruise", choices=["cruise", "orbit", "hover"], help="Flight pattern")
+    parser.add_argument("--mode", type=str, default="cruise", choices=["cruise", "skyline", "sprint", "orbit", "hover"], help="Flight pattern")
     parser.add_argument("--damage", type=str, default="none", choices=["none", "dead_motor", "damaged_blade"], help="Failure type")
     parser.add_argument("--rotor", type=str, default="fr", choices=["fr", "fl", "rr", "rl"], help="Target rotor to damage")
     parser.add_argument("--damage-step", type=int, default=200, help="Step at which failure is injected")

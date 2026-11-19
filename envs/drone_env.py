@@ -18,7 +18,7 @@ class CityDroneEnv(gym.Env):
     """
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
-    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.5)):
+    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.5), max_radius=28.0, max_altitude=16.0, max_steps=100000):
         super().__init__()
         if mujoco is None:
             raise ImportError("MuJoCo is required. Install via `pip install mujoco`.")
@@ -35,6 +35,9 @@ class CityDroneEnv(gym.Env):
         # Simulation parameters
         self.dt = self.model.opt.timestep
         self.target_pos = np.array(target_pos, dtype=np.float32)
+        self.max_radius = float(max_radius)
+        self.max_altitude = float(max_altitude)
+        self.max_steps = max_steps
 
         # Drone physical parameters
         self.drone_body_id = self.model.body("drone").id
@@ -182,16 +185,16 @@ class CityDroneEnv(gym.Env):
 
         reward = float(6.0 * r_z + 4.0 * r_pos + 2.0 * r_vel + 2.0 * upright - penalty_geofence - 0.01 * np.sum(action))
 
-        # Terminate if crashed to ground, hit outer plaza perimeter, or breached ceiling
+        # Terminate if crashed to ground, breached urban geofence radius, or breached ceiling
         ground_crash = bool(curr_pos[2] < 0.45)
-        building_perimeter = bool(r_horiz > 4.5)  # Enforces stay inside plaza; avoids lamps (6.8m) & trees (8.5m)
-        ceiling_breach = bool(curr_pos[2] > 9.0)
+        building_perimeter = bool(r_horiz > self.max_radius)
+        ceiling_breach = bool(curr_pos[2] > self.max_altitude)
 
         terminated = ground_crash or building_perimeter or ceiling_breach
-        if terminated and self.current_step < 1000:
+        if terminated and (self.max_steps is None or self.current_step < self.max_steps):
             reward -= 50.0  # Harsh penalty for any crash or boundary collision
 
-        truncated = bool(self.current_step >= 1000)
+        truncated = bool(self.max_steps is not None and self.current_step >= self.max_steps)
 
         info = {
             "altitude": float(curr_pos[2]),

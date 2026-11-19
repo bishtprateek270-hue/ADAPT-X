@@ -115,7 +115,7 @@ class WebSocketBroadcaster:
 class SimulationWorker:
     def __init__(self, target_altitude=4.5, width=1280, height=720, jpeg_quality=85):
         self.target_altitude = target_altitude
-        self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude))
+        self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=28.0, max_altitude=16.0, max_steps=1000000)
         self.env.reset_adaptive()
 
         # Configurable resolution: 720p (1280x720), 1080p (1920x1080), or 450p (800x450)
@@ -159,13 +159,13 @@ class SimulationWorker:
             except Exception as e:
                 print(f"[SimulationWorker] ONNX load warning: {e}")
 
-        # Control gains
-        self.kp_z = 28.0
-        self.kd_z = 8.5
-        self.kp_pos = 0.35
-        self.kd_pos = 0.45
-        self.kp_att = 3.8
-        self.kd_att = 0.50
+        # Control gains tuned for high-speed dynamic city canyon navigation
+        self.kp_z = 26.0
+        self.kd_z = 9.5
+        self.kp_pos = 0.90
+        self.kd_pos = 0.70
+        self.kp_att = 3.6
+        self.kd_att = 0.45
         self.step_count = 0
 
         self.telemetry = {
@@ -188,29 +188,35 @@ class SimulationWorker:
             "step": 0
         }
 
-    def _update_camera(self):
+    def _update_camera(self, heading_rad=None):
+        if heading_rad is None:
+            heading_rad = 0.0
+            
+        drone_heading_deg = float(np.degrees(heading_rad))
+
         if self.camera_mode == "chase":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 2.4
-            self.camera.elevation = -12.0
-            self.camera.azimuth = 90.0
+            self.camera.distance = 3.2
+            self.camera.elevation = -14.0
+            # Dynamically frame behind the drone's flight direction
+            self.camera.azimuth = (drone_heading_deg - 90.0) % 360.0
         elif self.camera_mode == "fpv":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 0.5
-            self.camera.elevation = -4.0
-            self.camera.azimuth = 0.0
+            self.camera.distance = 0.35
+            self.camera.elevation = -2.0
+            self.camera.azimuth = (drone_heading_deg - 90.0) % 360.0
         elif self.camera_mode == "orbit":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 3.6
-            self.camera.elevation = -18.0
-            self.camera.azimuth = (self.step_count * 0.4) % 360.0
+            self.camera.distance = 4.2
+            self.camera.elevation = -16.0
+            self.camera.azimuth = (self.step_count * 0.35) % 360.0
         elif self.camera_mode == "top":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
-            self.camera.distance = 5.2
+            self.camera.distance = 26.0
             self.camera.elevation = -89.0
             self.camera.azimuth = 0.0
 
@@ -288,38 +294,92 @@ class SimulationWorker:
                 # CONTROLLER EXECUTION
                 # -------------------------------------------------------------
                 if self.damage_motor == "none":
-                    # Nominal 4-Rotor Precision Flight
+                    # Nominal 4-Rotor Precision City Flight (5 Dynamic Trajectories)
                     if self.flight_mode == "cruise":
-                        x_des = 1.8 * np.cos(0.35 * t)
-                        y_des = 1.8 * np.sin(0.35 * t)
-                        z_des = self.target_altitude + 0.15 * np.sin(0.5 * t)
+                        # Avenue Patrol: Figure-8 Lissajous traversing North/South avenue and East/West boulevard
+                        omega_x = 0.18
+                        omega_y = 0.36
+                        x_des = 13.5 * np.sin(omega_x * t)
+                        vx_des = 13.5 * omega_x * np.cos(omega_x * t)
+                        ax_des = -13.5 * (omega_x**2) * np.sin(omega_x * t)
+                        y_des = 10.5 * np.sin(omega_y * t)
+                        vy_des = 10.5 * omega_y * np.cos(omega_y * t)
+                        ay_des = -10.5 * (omega_y**2) * np.sin(omega_y * t)
+                        z_des = self.target_altitude + 0.8 * np.sin(0.35 * t)
+                        vz_des = 0.8 * 0.35 * np.cos(0.35 * t)
+                    elif self.flight_mode == "skyline":
+                        # Skyline Survey: High-altitude perimeter sweep level with skyscraper crowns
+                        omega = 0.14
+                        x_des = 11.5 * np.cos(omega * t)
+                        vx_des = -11.5 * omega * np.sin(omega * t)
+                        ax_des = -11.5 * (omega**2) * np.cos(omega * t)
+                        y_des = 11.5 * np.sin(omega * t)
+                        vy_des = 11.5 * omega * np.cos(omega * t)
+                        ay_des = -11.5 * (omega**2) * np.sin(omega * t)
+                        z_des = 8.2 + 1.2 * np.sin(0.28 * t)
+                        vz_des = 1.2 * 0.28 * np.cos(0.28 * t)
+                    elif self.flight_mode == "sprint":
+                        # Boulevard Dash: High-speed avenue sprint with banked 180° turns
+                        omega = 0.22
+                        x_des = 14.5 * np.sin(omega * t)
+                        vx_des = 14.5 * omega * np.cos(omega * t)
+                        ax_des = -14.5 * (omega**2) * np.sin(omega * t)
+                        y_des = 1.2 * np.sin(2.0 * omega * t)
+                        vy_des = 1.2 * 2.0 * omega * np.cos(2.0 * omega * t)
+                        ay_des = -1.2 * 4.0 * (omega**2) * np.sin(2.0 * omega * t)
+                        z_des = 4.6 + 0.5 * np.cos(omega * t)
+                        vz_des = -0.5 * omega * np.sin(omega * t)
                     elif self.flight_mode == "orbit":
-                        x_des = 2.2 * np.cos(0.25 * t)
-                        y_des = 2.2 * np.sin(0.25 * t)
+                        # Plaza Orbit: Broad circular sweep around the grand plaza
+                        omega = 0.22
+                        x_des = 5.2 * np.cos(omega * t)
+                        vx_des = -5.2 * omega * np.sin(omega * t)
+                        ax_des = -5.2 * (omega**2) * np.cos(omega * t)
+                        y_des = 5.2 * np.sin(omega * t)
+                        vy_des = 5.2 * omega * np.cos(omega * t)
+                        ay_des = -5.2 * (omega**2) * np.sin(omega * t)
                         z_des = self.target_altitude
-                    else:
+                        vz_des = 0.0
+                    else:  # hover / hold
                         x_des, y_des, z_des = 0.0, 0.0, self.target_altitude
+                        vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
+                        ax_des, ay_des = 0.0, 0.0
 
-                    # Active Geofence Safeguard (Strict containment within plaza < 2.5m)
-                    ex = x_des - curr_pos[0]
-                    ey = y_des - curr_pos[1]
-                    if r_horiz > 2.6:
-                        pen = r_horiz - 2.6
-                        ux, uy = curr_pos[0] / r_horiz, curr_pos[1] / r_horiz
-                        ex -= 2.0 * pen * ux
-                        ey -= 2.0 * pen * uy
+                    # Feedforward + Feedback Horizontal Acceleration
+                    ax_req = ax_des + self.kp_pos * (x_des - curr_pos[0]) + self.kd_pos * (vx_des - curr_vel[0])
+                    ay_req = ay_des + self.kp_pos * (y_des - curr_pos[1]) + self.kd_pos * (vy_des - curr_vel[1])
 
-                    pitch_des = np.clip( (self.kp_pos * ex - self.kd_pos * curr_vel[0]), -0.15, 0.15)
-                    roll_des  = np.clip(-(self.kp_pos * ey - self.kd_pos * curr_vel[1]), -0.15, 0.15)
+                    # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
+                    if abs(curr_pos[0]) > 20.0:
+                        ax_req -= 2.5 * np.sign(curr_pos[0]) * (abs(curr_pos[0]) - 20.0)
+                    if abs(curr_pos[1]) > 20.0:
+                        ay_req -= 2.5 * np.sign(curr_pos[1]) * (abs(curr_pos[1]) - 20.0)
+
+                    # Rotate into drone body frame based on current yaw heading
+                    cos_psi = np.cos(curr_yaw)
+                    sin_psi = np.sin(curr_yaw)
+                    ax_b =  cos_psi * ax_req + sin_psi * ay_req
+                    ay_b = -sin_psi * ax_req + cos_psi * ay_req
+
+                    pitch_des = float(np.clip( ax_b / 9.81, -0.32, 0.32))
+                    roll_des  = float(np.clip(-ay_b / 9.81, -0.32, 0.32))
+
+                    # Dynamic Heading Alignment: drone nose points along flight velocity vector
+                    v_speed = np.hypot(vx_des, vy_des)
+                    if v_speed > 0.4:
+                        psi_des = np.arctan2(vy_des, vx_des)
+                    else:
+                        psi_des = curr_yaw
+                    yaw_err = (psi_des - curr_yaw + np.pi) % (2.0 * np.pi) - np.pi
+                    tau_yaw = 0.85 * yaw_err - 0.35 * wz
 
                     ez = z_des - curr_pos[2]
                     fz_nominal = self.env.mass * 9.81
-                    delta_fz = self.kp_z * ez - self.kd_z * curr_vel[2]
+                    delta_fz = self.kp_z * ez + self.kd_z * (vz_des - curr_vel[2])
                     fz_total = np.clip((fz_nominal + delta_fz) / cos_tilt, 2.0, 4.0 * max_thrust * 0.95)
 
                     tau_roll  = self.kp_att * (roll_des - curr_roll)   - self.kd_att * wx
                     tau_pitch = self.kp_att * (pitch_des - curr_pitch) - self.kd_att * wy
-                    tau_yaw   = -0.35 * wz
 
                     w_cmd = np.array([fz_total, tau_roll, tau_pitch, tau_yaw])
                     raw_forces = np.linalg.inv(self.B_alloc) @ w_cmd
@@ -328,7 +388,7 @@ class SimulationWorker:
                 else:
                     # ---------------------------------------------------------
                     # ⚡ SELF-HEALING ROTOR RECOVERY (ZERO COLLISION GUARANTEE)
-                    # Instantly locks to plaza center (0, 0, target_altitude)
+                    # Dynamically stabilizes altitude and safely brakes horizontal motion
                     # ---------------------------------------------------------
                     dead_idx = {"fr": 0, "fl": 1, "rr": 2, "rl": 3}.get(self.damage_motor, 0)
                     alive = [j for j in range(4) if j != dead_idx]
@@ -339,9 +399,9 @@ class SimulationWorker:
                     ez = z_des - curr_pos[2]
                     fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 9.5 * curr_vel[2]) / cos_tilt, 2.0, 36.0)
 
-                    # Restoring horizontal acceleration towards plaza center (0, 0)
-                    a_x_w = np.clip(0.65 * (0.0 - curr_pos[0]) - 0.85 * curr_vel[0], -0.8, 0.8)
-                    a_y_w = np.clip(0.65 * (0.0 - curr_pos[1]) - 0.85 * curr_vel[1], -0.8, 0.8)
+                    # Controlled horizontal braking & safe drift towards grand plaza
+                    a_x_w = np.clip(-1.2 * curr_vel[0] - 0.40 * curr_pos[0], -1.0, 1.0)
+                    a_y_w = np.clip(-1.2 * curr_vel[1] - 0.40 * curr_pos[1], -1.0, 1.0)
 
                     z_b_des = np.array([a_x_w / 9.81, a_y_w / 9.81, 1.0])
                     z_b_des /= np.linalg.norm(z_b_des)
@@ -373,7 +433,7 @@ class SimulationWorker:
                         for k, al in enumerate(alive):
                             raw_forces[al] = f_alive[k]
                         action = np.clip(raw_forces, 0.0, max_thrust)
-                        status_str = f"⚡ DYNAMIC REBALANCE ACTIVE - ROTOR {self.damage_motor.upper()} COMPENSATED (PLAZA LOCKED)"
+                        status_str = f"⚡ DYNAMIC REBALANCE ACTIVE - ROTOR {self.damage_motor.upper()} COMPENSATED (SAFE BRAKING)"
 
                 # Step physics with adaptive history tracking
                 obs, hist, reward, terminated, truncated, _ = self.env.step_adaptive(action)
@@ -382,9 +442,8 @@ class SimulationWorker:
                     if self.damage_motor != "none":
                         self.env.inject_rotor_fault("dead_motor", rotor=self.damage_motor)
 
-                # Camera update
-                if self.camera_mode == "orbit":
-                    self._update_camera()
+                # Dynamically frame camera behind current flight heading
+                self._update_camera(curr_yaw)
 
                 # Render offscreen frame (0.21 ms in EGL)
                 self.renderer.update_scene(self.env.data, camera=self.camera)
@@ -402,7 +461,18 @@ class SimulationWorker:
                     fps_counter = 0
                     fps_timer = time.perf_counter()
 
-                containment_label = "SAFE (CENTER PLAZA)" if r_horiz < 1.5 else f"CONTAINED (R={r_horiz:.1f}m < 3.5m)"
+                # Realistic city canyon location containment label
+                if r_horiz < 2.5:
+                    containment_label = "GRAND PLAZA (CENTER)"
+                elif abs(curr_pos[0]) > abs(curr_pos[1]) * 1.5:
+                    side = "EAST" if curr_pos[0] > 0 else "WEST"
+                    containment_label = f"{side} BOULEVARD (X={curr_pos[0]:+.1f}m)"
+                elif abs(curr_pos[1]) > abs(curr_pos[0]) * 1.5:
+                    side = "NORTH" if curr_pos[1] > 0 else "SOUTH"
+                    containment_label = f"{side} AVENUE (Y={curr_pos[1]:+.1f}m)"
+                else:
+                    quad = ("NE" if curr_pos[0] > 0 else "NW") if curr_pos[1] > 0 else ("SE" if curr_pos[0] > 0 else "SW")
+                    containment_label = f"CITY CANYON {quad} (R={r_horiz:.1f}m)"
 
                 self.telemetry = {
                     "altitude": round(float(curr_pos[2]), 2),
@@ -598,16 +668,16 @@ HTML_PAGE = """<!DOCTYPE html>
     z-index: 10;
   }
 
-  /* Urban Plaza Safe Containment Radar */
+  /* Urban City Safe Containment Radar */
   .hud-radar {
     position: absolute;
     bottom: 14px;
     right: 14px;
-    width: 90px;
-    height: 90px;
-    background: rgba(11, 17, 33, 0.85);
+    width: 96px;
+    height: 96px;
+    background: rgba(11, 17, 33, 0.88);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(56, 189, 248, 0.4);
+    border: 1px solid rgba(56, 189, 248, 0.45);
     border-radius: 50%;
     pointer-events: none;
     display: flex;
@@ -615,20 +685,32 @@ HTML_PAGE = """<!DOCTYPE html>
     justify-content: center;
     z-index: 10;
   }
+  .radar-crosshair-x {
+    position: absolute;
+    width: 76px;
+    height: 1px;
+    background: rgba(56, 189, 248, 0.25);
+  }
+  .radar-crosshair-y {
+    position: absolute;
+    width: 1px;
+    height: 76px;
+    background: rgba(56, 189, 248, 0.25);
+  }
   .radar-ring {
     position: absolute;
     border: 1px dashed rgba(56, 189, 248, 0.35);
     border-radius: 50%;
   }
-  .radar-ring.outer { width: 72px; height: 72px; border-color: rgba(244, 63, 94, 0.4); }
-  .radar-ring.inner { width: 38px; height: 38px; }
+  .radar-ring.outer { width: 76px; height: 76px; border-color: rgba(244, 63, 94, 0.45); }
+  .radar-ring.inner { width: 40px; height: 40px; }
   .radar-drone-dot {
     position: absolute;
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     background: var(--accent-cyan);
     border-radius: 50%;
-    box-shadow: 0 0 8px var(--accent-cyan);
+    box-shadow: 0 0 10px var(--accent-cyan);
     transition: transform 0.05s linear;
   }
   .radar-label {
@@ -851,9 +933,11 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Urban Plaza Safe Containment Radar -->
-    <div class="hud-radar" title="Plaza Containment Radar (Red = Perimeter Limit, Cyan = Drone)">
-      <div class="radar-label">Radar</div>
+    <!-- Urban City Safe Containment Radar -->
+    <div class="hud-radar" title="City Arena Radar (Outer Circle = 18m City Limit, Center = Grand Plaza)">
+      <div class="radar-label">City Radar</div>
+      <div class="radar-crosshair-x"></div>
+      <div class="radar-crosshair-y"></div>
       <div class="radar-ring outer"></div>
       <div class="radar-ring inner"></div>
       <div class="radar-drone-dot" id="radar-dot"></div>
@@ -950,13 +1034,17 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Trajectory Mode -->
+    <!-- Trajectory Mode (City Flight Paths) -->
     <div class="card">
-      <div class="card-title">Trajectory Mode</div>
-      <div class="mode-row cols-3">
-        <button class="btn active" id="mode-cruise" onclick="setFlightMode('cruise')">Cruise</button>
-        <button class="btn" id="mode-orbit" onclick="setFlightMode('orbit')">Wide Orbit</button>
-        <button class="btn" id="mode-hover" onclick="setFlightMode('hover')">Hover</button>
+      <div class="card-title">City Trajectory Mode</div>
+      <div class="mode-row cols-3" style="margin-bottom: 6px;">
+        <button class="btn active" id="mode-cruise" onclick="setFlightMode('cruise')" title="Traverse avenues and boulevards between skyscrapers">Avenue Patrol</button>
+        <button class="btn" id="mode-skyline" onclick="setFlightMode('skyline')" title="High-altitude perimeter sweep level with skyscraper roofs">Skyline Survey</button>
+        <button class="btn" id="mode-sprint" onclick="setFlightMode('sprint')" title="High-speed sprint down the long straight boulevard">Boulevard Dash</button>
+      </div>
+      <div class="mode-row cols-2">
+        <button class="btn" id="mode-orbit" onclick="setFlightMode('orbit')" title="Circular perimeter patrol around the grand plaza">Plaza Orbit</button>
+        <button class="btn" id="mode-hover" onclick="setFlightMode('hover')" title="Stationary aerial surveillance lock">Stationary Lock</button>
       </div>
     </div>
 
@@ -1014,11 +1102,11 @@ function updateHUD(data) {
     }
   }
 
-  // Containment Radar Dot
+  // City Arena Radar Dot (18m range scaled to HUD circle)
   const dot = document.getElementById('radar-dot');
   if (dot && data.x !== undefined && data.y !== undefined) {
-    const rx = Math.max(-36, Math.min(36, (data.x / 2.5) * 36));
-    const ry = Math.max(-36, Math.min(36, (-data.y / 2.5) * 36));
+    const rx = Math.max(-38, Math.min(38, (data.x / 18.0) * 38));
+    const ry = Math.max(-38, Math.min(38, (-data.y / 18.0) * 38));
     dot.style.transform = `translate(${rx}px, ${ry}px)`;
   }
 
@@ -1141,7 +1229,7 @@ function setCam(cam) {
 }
 function setFlightMode(mode) {
   sendCommand({ action: 'set_mode', mode: mode });
-  ['cruise', 'orbit', 'hover'].forEach(m => {
+  ['cruise', 'skyline', 'sprint', 'orbit', 'hover'].forEach(m => {
     const el = document.getElementById('mode-' + m);
     if (el) el.classList.toggle('active', m === mode);
   });
@@ -1164,7 +1252,7 @@ function toggleFullscreen() {
 
 // Keyboard shortcuts for instant hands-on control
 const CAMERAS = ['chase', 'fpv', 'orbit', 'top'];
-const MODES = ['cruise', 'orbit', 'hover'];
+const MODES = ['cruise', 'skyline', 'sprint', 'orbit', 'hover'];
 let currentCamIdx = 0;
 let currentModeIdx = 0;
 
