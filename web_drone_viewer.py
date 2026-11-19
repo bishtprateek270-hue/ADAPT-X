@@ -1269,12 +1269,97 @@ function updateHUD(data) {
   }
 }
 
-// WebSocket Connection Management
+// WebSocket & Dual-Engine Streaming Pipeline (Zero-Lag WS with Instant HTTP Fallback)
 let ws = null;
 let wsConnected = false;
+let httpFallbackActive = false;
+let httpFallbackTimer = null;
 const wsHost = window.location.hostname || 'localhost';
 const wsPort = 8081;
 const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + wsHost + ':' + wsPort;
+
+async function renderJpegBlob(blob) {
+  let drawn = false;
+  if (window.createImageBitmap) {
+    try {
+      const bmp = await createImageBitmap(blob);
+      if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+        canvas.width = bmp.width;
+        canvas.height = bmp.height;
+      }
+      ctx.drawImage(bmp, 0, 0);
+      bmp.close();
+      drawn = true;
+    } catch (e) {
+      drawn = false;
+    }
+  }
+  if (!drawn) {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      if (canvas.width !== img.width || canvas.height !== img.height) {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+}
+
+function updateFrameStats() {
+  clientFrameCount++;
+  const now = performance.now();
+  if (now - lastFpsTime >= 500) {
+    measuredClientFps = Math.round((clientFrameCount * 1000) / (now - lastFpsTime));
+    clientFrameCount = 0;
+    lastFpsTime = now;
+    const fpsEl = document.getElementById('hud-client-fps');
+    if (fpsEl) fpsEl.innerText = measuredClientFps + ' FPS';
+  }
+}
+
+// HTTP Fallback Poller: Guarantees zero blank screen if WebSocket is connecting or blocked
+let isFetchingHttpFrame = false;
+function triggerHttpFallback() {
+  if (wsConnected) return;
+  if (isFetchingHttpFrame) return;
+  isFetchingHttpFrame = true;
+
+  fetch('/frame.jpg?t=' + Date.now(), { cache: 'no-store' })
+    .then(async (resp) => {
+      if (!resp.ok) throw new Error('HTTP frame fetch failed');
+      const telHeader = resp.headers.get('X-Telemetry');
+      if (telHeader) {
+        try {
+          const tel = JSON.parse(telHeader);
+          updateHUD(tel);
+        } catch(e) {}
+      }
+      const blob = await resp.blob();
+      await renderJpegBlob(blob);
+      updateFrameStats();
+      if (!wsConnected) {
+        const chip = document.getElementById('hud-stream-mode');
+        if (chip) {
+          chip.innerText = '📡 HTTP STREAM (FALLBACK)';
+          chip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        }
+      }
+    })
+    .catch(() => {})
+    .finally(() => {
+      isFetchingHttpFrame = false;
+      if (!wsConnected) {
+        httpFallbackTimer = setTimeout(triggerHttpFallback, 25);
+      }
+    });
+}
 
 function connectWebSocket() {
   try {
@@ -1283,9 +1368,12 @@ function connectWebSocket() {
 
     ws.onopen = () => {
       wsConnected = true;
+      if (httpFallbackTimer) clearTimeout(httpFallbackTimer);
       const chip = document.getElementById('hud-stream-mode');
-      chip.innerText = '⚡ WEBSOCKET 50 FPS (ZERO LAG)';
-      chip.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      if (chip) {
+        chip.innerText = '⚡ WEBSOCKET 50 FPS (ZERO LAG)';
+        chip.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+      }
     };
 
     ws.onmessage = async (e) => {
@@ -1301,62 +1389,41 @@ function connectWebSocket() {
           updateHUD(tel);
         } catch(err) {}
 
-        const jpegBytes = new Uint8Array(buf, 4 + jsonLen);
-        const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
-        try {
-          if (window.createImageBitmap) {
-            const bmp = await createImageBitmap(blob);
-            if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
-              canvas.width = bmp.width;
-              canvas.height = bmp.height;
-            }
-            ctx.drawImage(bmp, 0, 0);
-            bmp.close();
-          } else {
-            throw new Error("No createImageBitmap");
-          }
-        } catch (renderErr) {
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-          img.onload = () => {
-            if (canvas.width !== img.width || canvas.height !== img.height) {
-              canvas.width = img.width;
-              canvas.height = img.height;
-            }
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-          };
-          img.src = url;
-        }
-
-        clientFrameCount++;
-        const now = performance.now();
-        if (now - lastFpsTime >= 500) {
-          measuredClientFps = Math.round((clientFrameCount * 1000) / (now - lastFpsTime));
-          clientFrameCount = 0;
-          lastFpsTime = now;
-          document.getElementById('hud-client-fps').innerText = measuredClientFps + ' FPS';
-        }
+        const jpegBuf = buf.slice(4 + jsonLen);
+        const blob = new Blob([jpegBuf], { type: 'image/jpeg' });
+        await renderJpegBlob(blob);
+        updateFrameStats();
       }
     };
 
     ws.onclose = () => {
       wsConnected = false;
       const chip = document.getElementById('hud-stream-mode');
-      chip.innerText = '🔄 RECONNECTING WS...';
-      chip.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+      if (chip) {
+        chip.innerText = '🔄 WS RECONNECTING (HTTP ACTIVE)';
+        chip.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+      }
+      triggerHttpFallback();
       setTimeout(connectWebSocket, 1500);
     };
 
     ws.onerror = () => {
+      wsConnected = false;
+      triggerHttpFallback();
       if (ws) ws.close();
     };
   } catch(e) {
+    wsConnected = false;
+    triggerHttpFallback();
     setTimeout(connectWebSocket, 2000);
   }
 }
 
+// Start WebSocket connection and immediately initiate HTTP fallback for zero-second startup
 connectWebSocket();
+setTimeout(() => {
+  if (!wsConnected) triggerHttpFallback();
+}, 200);
 
 // Direct WebSocket Command Dispatch (with HTTP fallback)
 function sendCommand(msg) {
