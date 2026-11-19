@@ -117,7 +117,7 @@ fi
 echo -e " Hardware Engine   : ${CYAN}NVIDIA EGL Hardware Accelerated Rendering${NC}"
 echo -e " Physics Backend   : ${CYAN}MuJoCo 3.17 (50 Hz Urban City Dynamics)${NC}"
 echo -e " Mission Planner   : ${GREEN}Interactive 2D City Map (Click-to-Add Waypoints & Patrol Loops)${NC}"
-echo -e " Fail-Safe Engine  : ${CYAN}Fly-By-Wire Rate-Damped Gyrostabilization (Rock-Solid 3-Motor Hover)${NC}"
+echo -e " Fail-Safe Engine  : ${CYAN}Fly-By-Wire Rate-Damping & Active Guidance (Trajectory Following under Rotor Failure)${NC}"
 echo -e " Neural Policy     : ${CYAN}ADAPT-X Heavy Drone ONNX (DGX Spark Trained)${NC}"
 echo -e " Stream Resolution : ${GREEN}${RES}${NC} (HD Quality)"
 echo -e " Web Frontend      : ${GREEN}http://localhost:${HTTP_PORT}${NC}"
