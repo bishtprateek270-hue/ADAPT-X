@@ -4,83 +4,105 @@
 
   <visual>
     <global offwidth="1920" offheight="1080"/>
-    <quality shadowsize="2048"/>
-    <headlight ambient="0.48 0.48 0.50" diffuse="0.85 0.85 0.85" specular="0.4 0.4 0.4"/>
+    <quality shadowsize="4096"/>
+    <headlight ambient="0.50 0.50 0.52" diffuse="0.88 0.88 0.88" specular="0.45 0.45 0.45"/>
   </visual>
 
   <asset>
     <!-- Vibrant Realistic Sky and City Lighting -->
-    <texture type="skybox" builtin="gradient" rgb1="0.32 0.58 0.90" rgb2="0.82 0.92 1.0" width="1024" height="1024"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.25 0.52 0.88" rgb2="0.80 0.92 1.0" width="1024" height="1024"/>
 
     <!-- High-Resolution Architectural Facade & Ground Textures -->
     <texture name="glass_tower_tex" type="2d" file="textures/facade_glass_tower.png"/>
-    <material name="glass_tower_mat" texture="glass_tower_tex" texrepeat="2 4" reflectance="0.45" specular="0.95" shininess="0.9"/>
+    <material name="glass_tower_mat" texture="glass_tower_tex" texrepeat="2 4" reflectance="0.48" specular="0.95" shininess="0.92"/>
 
     <texture name="brick_loft_tex" type="2d" file="textures/facade_brick_loft.png"/>
-    <material name="brick_building_mat" texture="brick_loft_tex" texrepeat="2 3" reflectance="0.08" specular="0.15"/>
+    <material name="brick_building_mat" texture="brick_loft_tex" texrepeat="2 3" reflectance="0.08" specular="0.18"/>
 
     <texture name="modern_corporate_tex" type="2d" file="textures/facade_modern_corporate.png"/>
-    <material name="corporate_tower_mat" texture="modern_corporate_tex" texrepeat="2 4" reflectance="0.5" specular="0.9" shininess="0.85"/>
+    <material name="corporate_tower_mat" texture="modern_corporate_tex" texrepeat="2 4" reflectance="0.52" specular="0.95" shininess="0.88"/>
 
     <texture name="concrete_panels_tex" type="2d" file="textures/facade_concrete_panels.png"/>
-    <material name="concrete_tower_mat" texture="concrete_panels_tex" texrepeat="2 3" reflectance="0.2" specular="0.4"/>
+    <material name="concrete_tower_mat" texture="concrete_panels_tex" texrepeat="2 3" reflectance="0.22" specular="0.45"/>
 
     <texture name="storefront_tex" type="2d" file="textures/facade_storefront.png"/>
-    <material name="storefront_mat" texture="storefront_tex" texrepeat="2 1" reflectance="0.25" specular="0.45"/>
+    <material name="storefront_mat" texture="storefront_tex" texrepeat="2 1" reflectance="0.28" specular="0.5"/>
 
     <texture name="helipad_tex" type="2d" file="textures/helipad.png"/>
-    <material name="helipad_mat" texture="helipad_tex" reflectance="0.1" specular="0.2"/>
+    <material name="helipad_mat" texture="helipad_tex" reflectance="0.12" specular="0.25"/>
 
     <texture name="roof_tar_tex" type="2d" file="textures/roof_tar.png"/>
-    <material name="roof_mat" texture="roof_tar_tex" texrepeat="3 3" reflectance="0.05" specular="0.1"/>
+    <material name="roof_mat" texture="roof_tar_tex" texrepeat="3 3" reflectance="0.06" specular="0.12"/>
 
     <texture name="plaza_mosaic_tex" type="2d" file="textures/plaza_mosaic.png"/>
-    <material name="plaza_mosaic_mat" texture="plaza_mosaic_tex" reflectance="0.15" specular="0.3"/>
+    <material name="plaza_mosaic_mat" texture="plaza_mosaic_tex" reflectance="0.18" specular="0.35"/>
 
     <texture name="sidewalk_pavers_tex" type="2d" file="textures/sidewalk_pavers.png"/>
-    <material name="sidewalk_paver_mat" texture="sidewalk_pavers_tex" texrepeat="6 6" reflectance="0.1" specular="0.2"/>
+    <material name="sidewalk_paver_mat" texture="sidewalk_pavers_tex" texrepeat="6 6" reflectance="0.12" specular="0.22"/>
 
     <!-- Ground & Surface Materials -->
-    <texture name="grass_tex" type="2d" builtin="flat" rgb1="0.22 0.52 0.20" width="512" height="512"/>
-    <material name="grass_mat" texture="grass_tex" reflectance="0.05" specular="0.1"/>
+    <texture name="asphalt_road_tex" type="2d" file="textures/asphalt_road.png"/>
+    <material name="road_mat" texture="asphalt_road_tex" texrepeat="4 20" reflectance="0.14" specular="0.28"/>
 
-    <material name="road_mat" rgba="0.13 0.14 0.16 1.0" reflectance="0.12" specular="0.25"/>
-    <material name="plaza_granite_mat" rgba="0.75 0.76 0.79 1.0" reflectance="0.15" specular="0.3"/>
-    <material name="curb_mat" rgba="0.50 0.52 0.55 1.0"/>
-    <material name="road_line_mat" rgba="0.95 0.95 0.95 1.0"/>
-    <material name="road_yellow_mat" rgba="0.95 0.78 0.10 1.0"/>
+    <texture name="grass_tex" type="2d" builtin="flat" rgb1="0.20 0.50 0.18" width="512" height="512"/>
+    <material name="grass_mat" texture="grass_tex" reflectance="0.05" specular="0.08"/>
+
+    <material name="plaza_granite_mat" rgba="0.75 0.77 0.80 1.0" reflectance="0.18" specular="0.35"/>
+    <material name="curb_mat" rgba="0.52 0.54 0.58 1.0"/>
+    <material name="road_line_mat" rgba="0.96 0.96 0.96 1.0" emission="0.1"/>
+    <material name="road_yellow_mat" rgba="0.96 0.80 0.12 1.0" emission="0.1"/>
+
+    <!-- Fountain Water, Jets & Spray Materials -->
+    <texture name="fountain_water_tex" type="2d" file="textures/fountain_water.png"/>
+    <material name="fountain_water_mat" texture="fountain_water_tex" texrepeat="2 2" rgba="0.25 0.75 0.95 0.85" reflectance="0.75" specular="0.98" shininess="0.95"/>
+    <texture name="water_spray_tex" type="2d" file="textures/water_spray.png"/>
+    <material name="water_geyser_mat" texture="water_spray_tex" rgba="0.85 0.95 1.0 0.85" specular="0.95" emission="0.35" shininess="0.9"/>
+    <material name="water_spray_mat" rgba="0.80 0.92 1.0 0.75" specular="0.90" emission="0.25"/>
+    <material name="water_fall_mat" rgba="0.75 0.90 1.0 0.70" specular="0.95" emission="0.20"/>
 
     <!-- Architectural Trim & Mechanical Materials -->
     <material name="metal_spire_mat" rgba="0.88 0.90 0.95 1.0" specular="0.95" shininess="0.95"/>
     <material name="hvac_metal_mat" rgba="0.45 0.48 0.52 1.0" specular="0.6"/>
     <material name="wood_water_tank" rgba="0.55 0.38 0.22 1.0" specular="0.05"/>
     <material name="chimney_brick" rgba="0.62 0.25 0.18 1.0" specular="0.05"/>
-    <material name="fountain_water_mat" rgba="0.15 0.55 0.85 0.8" specular="0.95" shininess="0.95" reflectance="0.6"/>
 
-    <!-- Vehicle Materials -->
-    <material name="taxi_yellow" rgba="0.98 0.78 0.08 1.0" specular="0.9" shininess="0.8"/>
-    <material name="van_blue" rgba="0.12 0.38 0.82 1.0" specular="0.8" shininess="0.7"/>
-    <material name="sedan_silver" rgba="0.82 0.84 0.88 1.0" specular="0.95" shininess="0.9"/>
-    <material name="car_red" rgba="0.90 0.12 0.12 1.0" specular="0.95" shininess="0.9"/>
-    <material name="car_glass" rgba="0.10 0.15 0.22 0.85" specular="0.98" reflectance="0.5"/>
+    <!-- Highly Detailed Vehicle Materials -->
+    <material name="taxi_yellow" rgba="0.98 0.78 0.08 1.0" specular="0.95" shininess="0.88"/>
+    <material name="car_paint_red" rgba="0.88 0.10 0.10 1.0" reflectance="0.55" specular="0.98" shininess="0.95"/>
+    <material name="car_paint_black" rgba="0.08 0.08 0.10 1.0" reflectance="0.60" specular="0.98" shininess="0.95"/>
+    <material name="car_paint_silver" rgba="0.82 0.84 0.88 1.0" reflectance="0.65" specular="0.98" shininess="0.95"/>
+    <material name="van_blue" rgba="0.12 0.35 0.75 1.0" specular="0.85" shininess="0.75"/>
+    <material name="police_white" rgba="0.96 0.96 0.96 1.0" specular="0.85"/>
+    <material name="car_glass" rgba="0.10 0.15 0.22 0.88" specular="0.98" reflectance="0.6"/>
+    <material name="car_chrome" rgba="0.92 0.93 0.96 1.0" specular="0.98" shininess="0.98"/>
     <material name="tire_rubber" rgba="0.08 0.08 0.09 1.0" specular="0.1"/>
+    <material name="wheel_alloy" rgba="0.75 0.76 0.80 1.0" specular="0.9" shininess="0.85"/>
+    <material name="headlight_xenon" rgba="0.95 0.98 1.0 1.0" emission="1.8"/>
+    <material name="taillight_led" rgba="0.98 0.05 0.05 1.0" emission="1.6"/>
+    <material name="turn_signal_amber" rgba="0.99 0.65 0.05 1.0" emission="1.2"/>
+    <material name="beacon_police_blue" rgba="0.1 0.5 1.0 1.0" emission="2.2"/>
+    <material name="beacon_police_red" rgba="1.0 0.08 0.08 1.0" emission="2.2"/>
 
-    <!-- Foliage / Trees -->
-    <material name="tree_trunk_mat" rgba="0.38 0.24 0.14 1.0" specular="0.05"/>
-    <material name="tree_leaf_mat" rgba="0.18 0.62 0.22 1.0" specular="0.1"/>
-    <material name="tree_leaf_dark" rgba="0.12 0.46 0.16 1.0" specular="0.1"/>
-    <material name="tree_leaf_autumn" rgba="0.82 0.52 0.12 1.0" specular="0.1"/>
-    <material name="tree_leaf_cypress" rgba="0.08 0.35 0.14 1.0" specular="0.15"/>
+    <!-- Foliage / Realistic Trees -->
+    <texture name="tree_leaf_tex" type="2d" file="textures/tree_leaf.png"/>
+    <material name="tree_leaf_mat" texture="tree_leaf_tex" texrepeat="2 2" reflectance="0.1" specular="0.15"/>
+    <material name="tree_leaf_dark" rgba="0.12 0.42 0.15 1.0" specular="0.1"/>
+    <material name="tree_leaf_autumn" rgba="0.88 0.52 0.12 1.0" specular="0.12"/>
+    <material name="tree_leaf_cypress" rgba="0.08 0.32 0.12 1.0" specular="0.15"/>
+    <texture name="tree_bark_tex" type="2d" file="textures/tree_bark.png"/>
+    <material name="tree_trunk_mat" texture="tree_bark_tex" texrepeat="1 4" reflectance="0.05" specular="0.08"/>
+    <material name="palm_frond_mat" rgba="0.15 0.58 0.18 1.0" specular="0.25"/>
 
     <!-- Street Furniture & Lights -->
-    <material name="street_iron_mat" rgba="0.22 0.23 0.25 1.0" specular="0.6"/>
+    <material name="street_iron_mat" rgba="0.20 0.21 0.24 1.0" specular="0.6"/>
     <material name="traffic_signal_yellow" rgba="0.95 0.80 0.05 1.0" specular="0.7"/>
-    <material name="signal_red_lit" rgba="0.98 0.1 0.1 1.0" emission="1.2"/>
-    <material name="signal_green_lit" rgba="0.1 0.98 0.2 1.0" emission="1.2"/>
-    <material name="lamp_light_mat" rgba="0.99 0.98 0.85 1.0" emission="1.0"/>
-    <material name="aircraft_beacon_mat" rgba="0.99 0.05 0.05 1.0" emission="1.5"/>
+    <material name="signal_red_lit" rgba="0.98 0.08 0.08 1.0" emission="1.5"/>
+    <material name="signal_green_lit" rgba="0.08 0.98 0.22 1.0" emission="1.5"/>
+    <material name="lamp_light_mat" rgba="0.99 0.98 0.85 1.0" emission="1.4"/>
+    <material name="aircraft_beacon_mat" rgba="0.99 0.05 0.05 1.0" emission="1.8"/>
 
     <!-- Drone Materials (Matte Carbon Fiber + Metallic Rotors) -->
+    <texture name="prop_blur_tex" type="2d" file="textures/prop_blur.png"/>
     <material name="drone_carbon_mat" rgba="0.08 0.09 0.11 1.0" specular="0.85" shininess="0.9"/>
     <material name="drone_arm_mat" rgba="0.12 0.13 0.15 1.0" specular="0.6" shininess="0.7"/>
     <material name="motor_mat" rgba="0.25 0.26 0.28 1.0" specular="0.95" shininess="0.9"/>
@@ -88,21 +110,25 @@
     <material name="anodized_red" rgba="0.92 0.12 0.12 1.0" specular="0.95" shininess="0.95"/>
     <material name="rotor_front_mat" rgba="0.92 0.18 0.14 0.75" specular="0.85"/>
     <material name="rotor_rear_mat" rgba="0.18 0.20 0.24 0.75" specular="0.85"/>
+    <material name="rotor_blur_fr" texture="prop_blur_tex" rgba="0.98 0.35 0.18 0.65" specular="0.95" shininess="0.9"/>
+    <material name="rotor_blur_fl" texture="prop_blur_tex" rgba="0.98 0.35 0.18 0.65" specular="0.95" shininess="0.9"/>
+    <material name="rotor_blur_rr" texture="prop_blur_tex" rgba="0.20 0.70 0.98 0.65" specular="0.95" shininess="0.9"/>
+    <material name="rotor_blur_rl" texture="prop_blur_tex" rgba="0.20 0.70 0.98 0.65" specular="0.95" shininess="0.9"/>
     <material name="prop_hub_mat" rgba="0.95 0.95 0.98 1.0" specular="0.95"/>
     <material name="battery_mat" rgba="0.16 0.17 0.19 1.0" specular="0.2"/>
     <material name="battery_label_mat" rgba="0.95 0.75 0.05 1.0"/>
     <material name="camera_gimbal_mat" rgba="0.20 0.21 0.24 1.0" specular="0.7"/>
     <material name="camera_lens_mat" rgba="0.08 0.25 0.65 1.0" specular="0.98" reflectance="0.6"/>
-    <material name="led_green" rgba="0.05 0.98 0.2 1.0" emission="1.0"/>
-    <material name="led_red" rgba="0.98 0.05 0.05 1.0" emission="1.0"/>
-    <material name="led_blue" rgba="0.1 0.5 0.98 1.0" emission="1.0"/>
-    <material name="led_white" rgba="0.98 0.98 0.98 1.0" emission="1.0"/>
+    <material name="led_green" rgba="0.05 0.98 0.2 1.0" emission="1.2"/>
+    <material name="led_red" rgba="0.98 0.05 0.05 1.0" emission="1.2"/>
+    <material name="led_blue" rgba="0.1 0.5 0.98 1.0" emission="1.2"/>
+    <material name="led_white" rgba="0.98 0.98 0.98 1.0" emission="1.2"/>
   </asset>
 
   <worldbody>
     <!-- Sunlight and Ambient Lighting -->
-    <light directional="true" diffuse="0.95 0.95 0.90" specular="0.4 0.4 0.4" pos="20 -20 35" dir="-0.3 0.3 -1"/>
-    <light directional="false" diffuse="0.48 0.48 0.55" pos="0 0 20"/>
+    <light directional="true" diffuse="0.98 0.97 0.92" specular="0.55 0.55 0.50" pos="25 -25 45" dir="-0.35 0.35 -1"/>
+    <light directional="false" diffuse="0.52 0.54 0.62" pos="0 0 25"/>
 
     <!-- Cinematic City Cameras -->
     <camera name="city_birds_eye" pos="-24 -24 22" xyaxes="0.707 -0.707 0 0.38 0.38 0.84"/>
@@ -112,19 +138,54 @@
     <geom name="ground" type="plane" size="80 80 0.1" material="grass_mat"/>
 
     <!-- Grand Central Plaza with Decorative Star Mosaic -->
-    <geom name="grand_plaza_border" type="plane" pos="0 0 0.001" size="8.2 8.2 0.01" material="plaza_granite_mat"/>
-    <geom name="grand_plaza_mosaic" type="plane" pos="0 0 0.002" size="6.5 6.5 0.01" material="plaza_mosaic_mat"/>
+    <geom name="grand_plaza_border" type="plane" pos="0 0 0.001" size="8.5 8.5 0.01" material="plaza_granite_mat"/>
+    <geom name="grand_plaza_mosaic" type="plane" pos="0 0 0.002" size="6.8 6.8 0.01" material="plaza_mosaic_mat"/>
 
-    <!-- Central Plaza Fountain & Granite Obelisk -->
+    <!-- ================================================================= -->
+    <!-- REALISTIC 3D WATER FOUNTAIN (WATER SPOUT, GEYSER, JETS & RIPPLES) -->
+    <!-- ================================================================= -->
     <body name="plaza_fountain" pos="0 0 0">
-      <geom type="cylinder" pos="0 0 0.25" size="1.6 0.25" material="plaza_granite_mat"/>
-      <geom type="cylinder" pos="0 0 0.48" size="1.45 0.02" material="fountain_water_mat"/>
-      <geom type="box" pos="0 0 0.75" size="0.45 0.45 0.25" material="plaza_granite_mat"/>
-      <geom type="cylinder" pos="0 0 1.5" size="0.18 0.5" material="plaza_granite_mat"/>
-      <geom type="cylinder" pos="0 0 2.2" size="0.08 0.3" material="metal_spire_mat"/>
+      <!-- Tier 1: Outer Grand Pool Granite Coping -->
+      <geom type="cylinder" pos="0 0 0.20" size="2.4 0.20" material="plaza_granite_mat"/>
+      <geom type="cylinder" pos="0 0 0.38" size="2.25 0.02" material="fountain_water_mat"/>
+      <!-- Outer Rim Moulding Ring -->
+      <geom type="cylinder" pos="0 0 0.39" size="2.42 0.03" material="curb_mat"/>
+
+      <!-- Tier 2: Mid Elevated Carved Stone Pedestal & Basin -->
+      <geom type="cylinder" pos="0 0 0.65" size="1.25 0.25" material="plaza_granite_mat"/>
+      <geom type="cylinder" pos="0 0 0.88" size="1.15 0.02" material="fountain_water_mat"/>
+      <!-- Mid Basin Water Overflow Cascade Lip -->
+      <geom type="cylinder" pos="0 0 0.89" size="1.28 0.02" material="curb_mat"/>
+
+      <!-- Tier 3: Upper Classical Column & Water Urn -->
+      <geom type="cylinder" pos="0 0 1.25" size="0.45 0.35" material="plaza_granite_mat"/>
+      <geom type="cylinder" pos="0 0 1.62" size="0.65 0.06" material="plaza_granite_mat"/>
+      <geom type="cylinder" pos="0 0 1.68" size="0.58 0.02" material="fountain_water_mat"/>
+
+      <!-- WATER COMING OUT OF THE FOUNTAIN: Central High-Velocity Geyser & Spray -->
+      <!-- Lower Dense Water Column -->
+      <geom name="fountain_jet_lower" type="cylinder" pos="0 0 2.05" size="0.14 0.38" material="water_geyser_mat"/>
+      <!-- Mid Translucent Rising Plume -->
+      <geom name="fountain_jet_mid" type="cylinder" pos="0 0 2.75" size="0.18 0.42" material="water_geyser_mat"/>
+      <!-- Aerated Water Spray Crown Plume -->
+      <geom name="fountain_jet_crown" type="ellipsoid" pos="0 0 3.35" size="0.32 0.32 0.28" material="water_geyser_mat"/>
+
+      <!-- Cascading Waterfall Rings Flowing Over Basins -->
+      <geom type="cylinder" pos="0 0 0.75" size="1.26 0.12" material="water_fall_mat"/>
+      <geom type="cylinder" pos="0 0 1.50" size="0.62 0.12" material="water_fall_mat"/>
+
+      <!-- 8 Arched Perimeter Water Spray Jets -->
+      <geom type="capsule" fromto="1.6 0 0.42 0.5 0 1.6" size="0.04" material="water_spray_mat"/>
+      <geom type="capsule" fromto="-1.6 0 0.42 -0.5 0 1.6" size="0.04" material="water_spray_mat"/>
+      <geom type="capsule" fromto="0 1.6 0.42 0 0.5 1.6" size="0.04" material="water_spray_mat"/>
+      <geom type="capsule" fromto="0 -1.6 0.42 0 -0.5 1.6" size="0.04" material="water_spray_mat"/>
+      <geom type="capsule" fromto="1.15 1.15 0.42 0.35 0.35 1.6" size="0.035" material="water_spray_mat"/>
+      <geom type="capsule" fromto="-1.15 1.15 0.42 -0.35 0.35 1.6" size="0.035" material="water_spray_mat"/>
+      <geom type="capsule" fromto="1.15 -1.15 0.42 0.35 -0.35 1.6" size="0.035" material="water_spray_mat"/>
+      <geom type="capsule" fromto="-1.15 -1.15 0.42 -0.35 -0.35 1.6" size="0.035" material="water_spray_mat"/>
     </body>
 
-    <!-- Broad Asphalt Boulevards (14m wide avenues) -->
+    <!-- Broad Asphalt Boulevards (14m wide avenues with real asphalt texture) -->
     <geom name="boulevard_ns" type="plane" pos="0 0 0.003" size="6.0 75 0.01" material="road_mat"/>
     <geom name="boulevard_ew" type="plane" pos="0 0 0.004" size="75 6.0 0.01" material="road_mat"/>
 
@@ -156,67 +217,88 @@
     <geom name="zebra_s4" type="box" pos="3.5 -7.5 0.006" size="0.45 0.65 0.001" material="road_line_mat"/>
 
     <!-- ================================================================= -->
-    <!-- 3D REAL-WORLD ARCHITECTURAL BUILDINGS (ALL HIGHLY UNIQUE & DETAILED) -->
+    <!-- 3D REAL-WORLD ARCHITECTURAL BUILDINGS (DETAILED 3D STRUCTURES) -->
     <!-- ================================================================= -->
 
     <!-- BUILDING 1: THE GRAND HORIZON SKYSCRAPER (North-East, pos=16 16) -->
-    <!-- Stepped 3-tier blue glass curtain-wall tower with rooftop helipad and spire -->
+    <!-- Stepped 3-tier blue glass curtain-wall tower with entrance portico, rooftop helipad and spire -->
     <body name="tower_ne" pos="16 16 0">
-      <!-- Ground Level Retail & Lobby Atrium -->
+      <!-- Ground Level Retail & Grand Lobby Atrium -->
       <geom type="box" pos="0 0 2.5" size="4.8 4.8 2.5" material="storefront_mat"/>
+      <!-- Lobby Glass Entrance Canopy / Portico -->
+      <geom type="box" pos="-4.9 0 2.8" size="0.8 2.2 0.12" material="car_chrome"/>
+      <geom type="cylinder" pos="-5.6 -1.8 1.4" size="0.08 1.4" material="car_chrome"/>
+      <geom type="cylinder" pos="-5.6 1.8 1.4" size="0.08 1.4" material="car_chrome"/>
+
       <!-- Tier 1: Lower Office Tower (Z: 5 to 13m) -->
       <geom type="box" pos="0 0 9.0" size="4.4 4.4 4.0" material="glass_tower_mat"/>
+      <!-- Setback Terraces with Safety Railings -->
+      <geom type="box" pos="0 0 13.05" size="4.4 4.4 0.05" material="roof_mat"/>
+
       <!-- Tier 2: Upper Executive Tower with Setback (Z: 13 to 19m) -->
       <geom type="box" pos="0 0 16.0" size="3.6 3.6 3.0" material="glass_tower_mat"/>
+      <geom type="box" pos="0 0 19.05" size="3.6 3.6 0.05" material="roof_mat"/>
+
       <!-- Tier 3: Penthouse Crown (Z: 19 to 22m) -->
       <geom type="box" pos="0 0 20.5" size="2.8 2.8 1.5" material="glass_tower_mat"/>
-      <!-- Rooftop Official Helipad -->
+
+      <!-- Rooftop Official Helipad with Perimeter Landing Lights -->
       <geom type="box" pos="0 0 22.05" size="2.6 2.6 0.05" material="helipad_mat"/>
-      <!-- Rooftop Architectural Spire with Flashing Red Beacon LED -->
+      <geom type="sphere" pos="2.4 2.4 22.15" size="0.08" material="turn_signal_amber"/>
+      <geom type="sphere" pos="-2.4 2.4 22.15" size="0.08" material="turn_signal_amber"/>
+      <geom type="sphere" pos="2.4 -2.4 22.15" size="0.08" material="turn_signal_amber"/>
+      <geom type="sphere" pos="-2.4 -2.4 22.15" size="0.08" material="turn_signal_amber"/>
+
+      <!-- Rooftop Architectural Spire with Aviation Warning Beacon -->
       <geom type="cylinder" pos="0 0 24.5" size="0.08 2.5" material="metal_spire_mat"/>
-      <geom type="sphere" pos="0 0 27.0" size="0.12" material="aircraft_beacon_mat"/>
+      <geom type="sphere" pos="0 0 27.0" size="0.16" material="aircraft_beacon_mat"/>
     </body>
 
     <!-- BUILDING 2: OLD METROPOLITAN BRICK LOFTS (North-West, pos=-16 16) -->
-    <!-- Heritage 5-story brownstone masonry with retail arcade & rooftop water tank -->
+    <!-- Heritage brownstone masonry with storefronts, cornice, fire escapes & rooftop water tank -->
     <body name="tower_nw" pos="-16 16 0">
       <!-- Ground Retail Arcade with Awnings -->
       <geom type="box" pos="0 0 2.2" size="4.6 4.8 2.2" material="storefront_mat"/>
       <!-- Heritage Red Brick Residential Body (Z: 4.4 to 12.4m) -->
       <geom type="box" pos="0 0 8.4" size="4.4 4.6 4.0" material="brick_building_mat"/>
-      <!-- Stepped Brick Cornice & Parapet -->
-      <geom type="box" pos="0 0 12.8" size="4.5 4.7 0.4" material="chimney_brick"/>
-      <geom type="box" pos="0 0 13.05" size="4.2 4.4 0.05" material="roof_mat"/>
+      <!-- Classic Stepped Italianate Brick Cornice & Parapet -->
+      <geom type="box" pos="0 0 12.7" size="4.65 4.85 0.3" material="chimney_brick"/>
+      <geom type="box" pos="0 0 13.05" size="4.3 4.5 0.05" material="roof_mat"/>
+
       <!-- Authentic NYC Cedar Water Tower on Steel Stilts -->
       <body name="water_tower" pos="1.5 -1.5 13.1">
-        <geom type="cylinder" pos="-0.8 -0.8 0.6" size="0.04 0.6" material="street_iron_mat"/>
-        <geom type="cylinder" pos="0.8 -0.8 0.6" size="0.04 0.6" material="street_iron_mat"/>
-        <geom type="cylinder" pos="-0.8 0.8 0.6" size="0.04 0.6" material="street_iron_mat"/>
-        <geom type="cylinder" pos="0.8 0.8 0.6" size="0.04 0.6" material="street_iron_mat"/>
+        <geom type="cylinder" pos="-0.8 -0.8 0.6" size="0.05 0.6" material="street_iron_mat"/>
+        <geom type="cylinder" pos="0.8 -0.8 0.6" size="0.05 0.6" material="street_iron_mat"/>
+        <geom type="cylinder" pos="-0.8 0.8 0.6" size="0.05 0.6" material="street_iron_mat"/>
+        <geom type="cylinder" pos="0.8 0.8 0.6" size="0.05 0.6" material="street_iron_mat"/>
         <!-- Cedar Barrel -->
         <geom type="cylinder" pos="0 0 1.9" size="0.95 0.7" material="wood_water_tank"/>
-        <!-- Conical Cap -->
+        <!-- Conical Roof Cap -->
         <geom type="cylinder" pos="0 0 2.8" size="0.9 0.2" material="roof_mat"/>
       </body>
       <!-- Industrial Red Brick Chimney Stack -->
-      <geom type="box" pos="-2.2 2.2 14.5" size="0.35 0.35 1.5" material="chimney_brick"/>
+      <geom type="box" pos="-2.2 2.2 14.5" size="0.4 0.4 1.5" material="chimney_brick"/>
     </body>
 
     <!-- BUILDING 3: APEX CORPORATE FINANCIAL CENTER (South-West, pos=-16 -16) -->
-    <!-- Dual-tier obsidian black glass & champagne bronze tower with rooftop HVAC chillers -->
+    <!-- Obsidian black glass & champagne bronze tower with rooftop HVAC chillers -->
     <body name="tower_sw" pos="-16 -16 0">
-      <!-- Ground Entrance Pavilion -->
+      <!-- Ground Entrance Pavilion with Columns -->
       <geom type="box" pos="0 0 2.2" size="4.8 4.2 2.2" material="corporate_tower_mat"/>
       <!-- Main Corporate Tower (Z: 4.4 to 15.4m) -->
       <geom type="box" pos="0 0 9.9" size="4.4 3.8 5.5" material="corporate_tower_mat"/>
       <!-- Architectural Setback Crown (Z: 15.4 to 18.4m) -->
       <geom type="box" pos="0 0 16.9" size="3.4 3.0 1.5" material="corporate_tower_mat"/>
       <geom type="box" pos="0 0 18.45" size="3.2 2.8 0.05" material="roof_mat"/>
-      <!-- Rooftop Mechanical HVAC Chillers & Satellite Uplink -->
-      <geom type="box" pos="0.8 0.6 19.2" size="0.8 0.6 0.7" material="hvac_metal_mat"/>
-      <geom type="box" pos="-0.8 0.6 19.2" size="0.8 0.6 0.7" material="hvac_metal_mat"/>
-      <geom type="cylinder" pos="0 -0.8 19.5" size="0.05 1.0" material="metal_spire_mat"/>
-      <geom type="sphere" pos="0 -0.8 20.4" size="0.4" material="metal_spire_mat"/>
+
+      <!-- Rooftop Mechanical HVAC Chillers & Industrial Fan Ducts -->
+      <geom type="box" pos="0.8 0.6 19.2" size="0.85 0.65 0.7" material="hvac_metal_mat"/>
+      <geom type="cylinder" pos="0.8 0.6 19.95" size="0.45 0.05" material="street_iron_mat"/>
+      <geom type="box" pos="-0.8 0.6 19.2" size="0.85 0.65 0.7" material="hvac_metal_mat"/>
+      <geom type="cylinder" pos="-0.8 0.6 19.95" size="0.45 0.05" material="street_iron_mat"/>
+      <!-- Microwave Communications Dish & Spire -->
+      <geom type="cylinder" pos="0 -0.8 19.5" size="0.06 1.0" material="metal_spire_mat"/>
+      <geom type="sphere" pos="0 -0.8 20.5" size="0.45" material="metal_spire_mat"/>
     </body>
 
     <!-- BUILDING 4: VANGUARD RESIDENCES & SKY-GARDEN (South-East, pos=16 -16) -->
@@ -224,14 +306,14 @@
     <body name="tower_se" pos="16 -16 0">
       <!-- Ground Level Lobby -->
       <geom type="box" pos="0 0 2.2" size="4.4 4.4 2.2" material="storefront_mat"/>
-      <!-- Residential Tower with Ribbon Windows (Z: 4.4 to 14.4m) -->
+      <!-- Residential Tower with Ribbon Glazing (Z: 4.4 to 14.4m) -->
       <geom type="box" pos="0 0 9.4" size="4.0 4.0 5.0" material="concrete_tower_mat"/>
-      <!-- Stepped Penthouse Level (Z: 14.4 to 17.4m) -->
+      <!-- Stepped Penthouse Level with Corner Balconies -->
       <geom type="box" pos="-0.5 0.5 15.9" size="3.0 3.0 1.5" material="concrete_tower_mat"/>
-      <!-- Sky Terrace Lawn & Pergola -->
-      <geom type="box" pos="1.4 -1.4 14.45" size="1.2 1.2 0.05" material="grass_mat"/>
-      <!-- Rooftop Elevator Machine Room -->
-      <geom type="box" pos="-1.0 1.0 17.9" size="1.0 1.0 0.5" material="roof_mat"/>
+      <!-- Sky Terrace Lawn & Outdoor Pergola -->
+      <geom type="box" pos="1.5 -1.5 14.45" size="1.4 1.4 0.05" material="grass_mat"/>
+      <!-- Rooftop Elevator Bulkhead -->
+      <geom type="box" pos="-1.0 1.0 17.9" size="1.1 1.1 0.5" material="roof_mat"/>
       <geom type="cylinder" pos="-1.0 1.0 19.2" size="0.06 0.8" material="metal_spire_mat"/>
     </body>
 
@@ -270,44 +352,122 @@
     <geom type="box" pos="38 -38 16.0" size="7.0 7.0 16.0" material="glass_tower_mat"/>
 
     <!-- ================================================================= -->
-    <!-- STREET-LEVEL CITY LIFE: PARKED CARS, LIGHTS, BUS STOPS & TREES -->
+    <!-- PHOTOREALISTIC 3D VEHICLES (CARS, TAXIS, POLICE INTERCEPTOR, SUVS) -->
     <!-- ================================================================= -->
 
-    <!-- Parked Vehicle 1: Yellow City Taxi Cab (pos=5.0 7.2) -->
+    <!-- CAR 1: Detailed Yellow NYC Taxi Cab (pos=5.0 7.2) -->
     <body name="taxi_cab" pos="5.0 7.2 0">
-      <!-- Chassis -->
-      <geom type="box" pos="0 0 0.30" size="1.7 0.75 0.18" material="taxi_yellow"/>
-      <!-- Cabin Glass & Roof -->
-      <geom type="box" pos="-0.1 0 0.54" size="0.95 0.68 0.16" material="car_glass"/>
-      <geom type="box" pos="-0.1 0 0.68" size="0.92 0.65 0.03" material="taxi_yellow"/>
-      <!-- Taxi Rooftop Sign -->
-      <geom type="box" pos="-0.1 0 0.74" size="0.25 0.12 0.04" material="taxi_yellow"/>
-      <!-- Wheels -->
-      <geom type="cylinder" pos="1.0 0.78 0.22" size="0.22 0.08" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.0 0.78 0.22" size="0.22 0.08" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="1.0 -0.78 0.22" size="0.22 0.08" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.0 -0.78 0.22" size="0.22 0.08" zaxis="0 1 0" material="tire_rubber"/>
+      <!-- Lower Chassis Body with Bumper -->
+      <geom type="box" pos="0 0 0.28" size="1.85 0.78 0.16" material="taxi_yellow"/>
+      <geom type="box" pos="1.82 0 0.26" size="0.08 0.74 0.12" material="curb_mat"/>
+      <geom type="box" pos="-1.82 0 0.26" size="0.08 0.74 0.12" material="curb_mat"/>
+      <!-- Cabin Windshields & Tinted Glass -->
+      <geom type="box" pos="-0.12 0 0.54" size="1.05 0.72 0.16" material="car_glass"/>
+      <geom type="box" pos="-0.12 0 0.69" size="0.98 0.68 0.03" material="taxi_yellow"/>
+      <!-- Taxi Rooftop Medallion Sign ("TAXI") -->
+      <geom type="box" pos="-0.12 0 0.76" size="0.28 0.12 0.04" material="taxi_yellow"/>
+      <!-- Xenon Headlights & LED Taillights -->
+      <geom type="cylinder" pos="1.84 0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="cylinder" pos="1.84 -0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="box" pos="-1.84 0.54 0.32" size="0.02 0.12 0.05" material="taillight_led"/>
+      <geom type="box" pos="-1.84 -0.54 0.32" size="0.02 0.12 0.05" material="taillight_led"/>
+      <!-- 4 Styled Wheels (Rubber Tire + Silver Alloy Rim) -->
+      <geom type="cylinder" pos="1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.1 0.81 0.24" size="0.15 0.09" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.1 0.81 0.24" size="0.15 0.09" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.1 -0.81 0.24" size="0.15 0.09" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.1 -0.81 0.24" size="0.15 0.09" zaxis="0 1 0" material="wheel_alloy"/>
     </body>
 
-    <!-- Parked Vehicle 2: Navy Blue Delivery Van (pos=-5.0 -12.0) -->
-    <body name="delivery_van" pos="-5.0 -12.0 0">
-      <geom type="box" pos="0 0 0.55" size="2.2 0.88 0.45" material="van_blue"/>
-      <geom type="box" pos="1.3 0 0.50" size="0.65 0.84 0.35" material="car_glass"/>
-      <geom type="cylinder" pos="1.4 0.90 0.25" size="0.25 0.10" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.3 0.90 0.25" size="0.25 0.10" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="1.4 -0.90 0.25" size="0.25 0.10" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.3 -0.90 0.25" size="0.25 0.10" zaxis="0 1 0" material="tire_rubber"/>
+    <!-- CAR 2: Gloss Red Aerodynamic Sports Coupe (pos=5.0 16.5) -->
+    <body name="red_sports_car" pos="5.0 16.5 0">
+      <geom type="box" pos="0 0 0.25" size="1.95 0.82 0.14" material="car_paint_red"/>
+      <!-- Aerodynamic Hood Scoop & Front Splitter -->
+      <geom type="box" pos="1.85 0 0.18" size="0.12 0.78 0.05" material="street_iron_mat"/>
+      <!-- Low-Slung Fastback Cockpit -->
+      <geom type="box" pos="-0.15 0 0.48" size="1.0 0.74 0.14" material="car_glass"/>
+      <geom type="box" pos="-0.15 0 0.62" size="0.94 0.70 0.02" material="car_paint_red"/>
+      <!-- Rear Carbon Fiber Spoiler Wing -->
+      <geom type="box" pos="-1.75 0 0.46" size="0.12 0.76 0.03" material="street_iron_mat"/>
+      <geom type="cylinder" pos="-1.75 0.5 0.35" size="0.02 0.12" material="street_iron_mat"/>
+      <geom type="cylinder" pos="-1.75 -0.5 0.35" size="0.02 0.12" material="street_iron_mat"/>
+      <!-- Xenon Projector Lights -->
+      <geom type="cylinder" pos="1.92 0.55 0.28" size="0.06 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="cylinder" pos="1.92 -0.55 0.28" size="0.06 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="box" pos="-1.92 0.58 0.28" size="0.02 0.12 0.04" material="taillight_led"/>
+      <geom type="box" pos="-1.92 -0.58 0.28" size="0.02 0.12 0.04" material="taillight_led"/>
+      <!-- Low Profile Sport Wheels with Black Rims -->
+      <geom type="cylinder" pos="1.15 0.84 0.23" size="0.23 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.15 0.84 0.23" size="0.23 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.15 -0.84 0.23" size="0.23 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.15 -0.84 0.23" size="0.23 0.10" zaxis="0 1 0" material="tire_rubber"/>
     </body>
 
-    <!-- Parked Vehicle 3: Executive Silver Sedan (pos=12.0 -5.0) -->
-    <body name="silver_sedan" pos="12.0 -5.0 0">
-      <geom type="box" pos="0 0 0.30" size="0.75 1.8 0.18" material="sedan_silver"/>
-      <geom type="box" pos="0 -0.1 0.54" size="0.68 1.0 0.16" material="car_glass"/>
-      <geom type="box" pos="0 -0.1 0.68" size="0.65 0.96 0.03" material="sedan_silver"/>
-      <geom type="cylinder" pos="0.78 1.0 0.22" size="0.22 0.08" zaxis="1 0 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="0.78 -1.0 0.22" size="0.22 0.08" zaxis="1 0 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-0.78 1.0 0.22" size="0.22 0.08" zaxis="1 0 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-0.78 -1.0 0.22" size="0.22 0.08" zaxis="1 0 0" material="tire_rubber"/>
+    <!-- CAR 3: Executive Obsidian Luxury SUV (pos=-5.0 16.5) -->
+    <body name="black_suv" pos="-5.0 16.5 0">
+      <geom type="box" pos="0 0 0.40" size="2.1 0.88 0.24" material="car_paint_black"/>
+      <geom type="box" pos="0 0 0.74" size="1.45 0.82 0.20" material="car_glass"/>
+      <geom type="box" pos="0 0 0.94" size="1.40 0.80 0.03" material="car_paint_black"/>
+      <!-- Roof Rack Rails -->
+      <geom type="capsule" fromto="1.1 0.65 0.98 -1.1 0.65 0.98" size="0.02" material="car_chrome"/>
+      <geom type="capsule" fromto="1.1 -0.65 0.98 -1.1 -0.65 0.98" size="0.02" material="car_chrome"/>
+      <!-- Front Chrome Grille & Headlights -->
+      <geom type="box" pos="2.08 0 0.42" size="0.04 0.50 0.16" material="car_chrome"/>
+      <geom type="cylinder" pos="2.08 0.62 0.45" size="0.08 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="cylinder" pos="2.08 -0.62 0.45" size="0.08 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="box" pos="-2.08 0.64 0.46" size="0.02 0.12 0.08" material="taillight_led"/>
+      <geom type="box" pos="-2.08 -0.64 0.46" size="0.02 0.12 0.08" material="taillight_led"/>
+      <!-- High-Clearance All-Terrain Wheels -->
+      <geom type="cylinder" pos="1.25 0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.25 0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.25 -0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.25 -0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
+    </body>
+
+    <!-- CAR 4: Highway Patrol / Police Emergency Cruiser (pos=-5.0 -8.5) -->
+    <body name="police_cruiser" pos="-5.0 -8.5 0">
+      <geom type="box" pos="0 0 0.28" size="1.85 0.78 0.16" material="police_white"/>
+      <geom type="box" pos="0.4 0 0.28" size="0.8 0.78 0.16" material="car_paint_black"/>
+      <geom type="box" pos="-0.4 0 0.28" size="0.8 0.78 0.16" material="car_paint_black"/>
+      <geom type="box" pos="-0.1 0 0.54" size="1.0 0.72 0.16" material="car_glass"/>
+      <geom type="box" pos="-0.1 0 0.68" size="0.95 0.68 0.03" material="police_white"/>
+      <!-- Front Heavy-Duty Push Bullbar -->
+      <geom type="box" pos="1.92 0 0.30" size="0.06 0.55 0.16" material="street_iron_mat"/>
+      <!-- Rooftop Emergency Lightbar (Red and Blue Strobe Beacons) -->
+      <geom type="box" pos="-0.1 0 0.74" size="0.12 0.45 0.03" material="street_iron_mat"/>
+      <geom type="box" pos="-0.1 -0.22 0.75" size="0.10 0.18 0.04" material="beacon_police_blue"/>
+      <geom type="box" pos="-0.1 0.22 0.75" size="0.10 0.18 0.04" material="beacon_police_red"/>
+      <!-- Headlights and Wheels -->
+      <geom type="cylinder" pos="1.84 0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="cylinder" pos="1.84 -0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
+      <geom type="cylinder" pos="1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+    </body>
+
+    <!-- CAR 5: Commercial Navy Delivery Cargo Van (pos=-5.0 -18.0) -->
+    <body name="delivery_van" pos="-5.0 -18.0 0">
+      <geom type="box" pos="0 0 0.60" size="2.4 0.90 0.50" material="van_blue"/>
+      <geom type="box" pos="1.4 0 0.55" size="0.75 0.86 0.38" material="car_glass"/>
+      <geom type="cylinder" pos="1.5 0.92 0.26" size="0.26 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.4 0.92 0.26" size="0.26 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.5 -0.92 0.26" size="0.26 0.10" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.4 -0.92 0.26" size="0.26 0.10" zaxis="0 1 0" material="tire_rubber"/>
+    </body>
+
+    <!-- CAR 6: Executive Metallic Silver Sedan (pos=15.0 -5.2) -->
+    <body name="silver_sedan" pos="15.0 -5.2 0">
+      <geom type="box" pos="0 0 0.28" size="0.78 1.85 0.16" material="car_paint_silver"/>
+      <geom type="box" pos="0 -0.1 0.54" size="0.72 1.05 0.16" material="car_glass"/>
+      <geom type="box" pos="0 -0.1 0.69" size="0.68 0.98 0.03" material="car_paint_silver"/>
+      <geom type="cylinder" pos="0.80 1.1 0.24" size="0.24 0.09" zaxis="1 0 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="0.80 -1.1 0.24" size="0.24 0.09" zaxis="1 0 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-0.80 1.1 0.24" size="0.24 0.09" zaxis="1 0 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-0.80 -1.1 0.24" size="0.24 0.09" zaxis="1 0 0" material="tire_rubber"/>
     </body>
 
     <!-- Modern Glass Bus Stop Shelter (pos=-6.8 9.5) -->
@@ -323,29 +483,28 @@
     <body name="traffic_light_north" pos="5.8 7.0 0">
       <geom type="cylinder" pos="0 0 2.4" size="0.06 2.4" material="street_iron_mat"/>
       <geom type="cylinder" pos="-1.2 0 4.6" size="0.04 1.2" zaxis="1 0 0" material="street_iron_mat"/>
-      <!-- Signal Box -->
       <geom type="box" pos="-2.2 0 4.6" size="0.15 0.15 0.45" material="traffic_signal_yellow"/>
-      <geom type="sphere" pos="-2.2 -0.16 4.9" size="0.08" material="signal_red_lit"/>
-      <geom type="sphere" pos="-2.2 -0.16 4.6" size="0.08" material="traffic_signal_yellow"/>
-      <geom type="sphere" pos="-2.2 -0.16 4.3" size="0.08" material="signal_green_lit"/>
+      <geom type="sphere" pos="-2.2 -0.16 4.9" size="0.09" material="signal_red_lit"/>
+      <geom type="sphere" pos="-2.2 -0.16 4.6" size="0.09" material="traffic_signal_yellow"/>
+      <geom type="sphere" pos="-2.2 -0.16 4.3" size="0.09" material="signal_green_lit"/>
     </body>
 
     <!-- Plaza Street Lamps with Warm Glowing Spherical Luminaires -->
     <body name="lamp_1" pos="6.8 6.8 0">
       <geom type="cylinder" pos="0 0 1.9" size="0.05 1.9" material="street_iron_mat"/>
-      <geom type="sphere" pos="-0.3 0 3.8" size="0.16" material="lamp_light_mat"/>
+      <geom type="sphere" pos="-0.3 0 3.8" size="0.18" material="lamp_light_mat"/>
     </body>
     <body name="lamp_2" pos="-6.8 6.8 0">
       <geom type="cylinder" pos="0 0 1.9" size="0.05 1.9" material="street_iron_mat"/>
-      <geom type="sphere" pos="0.3 0 3.8" size="0.16" material="lamp_light_mat"/>
+      <geom type="sphere" pos="0.3 0 3.8" size="0.18" material="lamp_light_mat"/>
     </body>
     <body name="lamp_3" pos="6.8 -6.8 0">
       <geom type="cylinder" pos="0 0 1.9" size="0.05 1.9" material="street_iron_mat"/>
-      <geom type="sphere" pos="-0.3 0 3.8" size="0.16" material="lamp_light_mat"/>
+      <geom type="sphere" pos="-0.3 0 3.8" size="0.18" material="lamp_light_mat"/>
     </body>
     <body name="lamp_4" pos="-6.8 -6.8 0">
       <geom type="cylinder" pos="0 0 1.9" size="0.05 1.9" material="street_iron_mat"/>
-      <geom type="sphere" pos="0.3 0 3.8" size="0.16" material="lamp_light_mat"/>
+      <geom type="sphere" pos="0.3 0 3.8" size="0.18" material="lamp_light_mat"/>
     </body>
 
     <!-- Plaza Park Benches -->
@@ -371,55 +530,80 @@
     </body>
 
     <!-- ================================================================= -->
-    <!-- URBAN TREES & BOTANICAL FOLIAGE (DIVERSE SPECIES & SHADES) -->
+    <!-- REALISTIC 3D TREES & URBAN FOLIAGE (BRANCHING CANOPY ARCHITECTURE) -->
     <!-- ================================================================= -->
-    <!-- Tree 1: Lush Green Boulevard Oak (pos=8.5 8.5) -->
+
+    <!-- TREE 1: Majestic Boulevard Oak (North-East, pos=8.5 8.5) -->
     <body name="tree_oak_ne" pos="8.5 8.5 0">
-      <geom type="cylinder" pos="0 0 1.2" size="0.16 1.2" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.5" size="1.2" material="tree_leaf_mat"/>
-      <geom type="sphere" pos="0.3 0.2 3.2" size="0.85" material="tree_leaf_dark"/>
+      <geom type="cylinder" pos="0 0 1.1" size="0.20 1.1" material="tree_trunk_mat"/>
+      <!-- Branching Limbs -->
+      <geom type="capsule" fromto="0 0 2.0 0.5 0.5 2.7" size="0.10" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 2.0 -0.5 0.4 2.6" size="0.10" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 2.0 0.1 -0.5 2.7" size="0.10" material="tree_trunk_mat"/>
+      <!-- Multi-Cluster Organic Foliage Canopy -->
+      <geom type="ellipsoid" pos="0 0 3.2" size="1.25 1.25 0.95" material="tree_leaf_mat"/>
+      <geom type="ellipsoid" pos="0.5 0.4 3.0" size="0.85 0.85 0.70" material="tree_leaf_dark"/>
+      <geom type="ellipsoid" pos="-0.5 0.4 2.9" size="0.85 0.85 0.70" material="tree_leaf_mat"/>
+      <geom type="ellipsoid" pos="0.2 -0.5 2.9" size="0.80 0.80 0.65" material="tree_leaf_dark"/>
+      <geom type="ellipsoid" pos="0 0 3.8" size="0.75 0.75 0.60" material="tree_leaf_mat"/>
     </body>
 
-    <!-- Tree 2: Autumn Golden Maple (pos=-8.5 8.5) -->
+    <!-- TREE 2: Autumn Golden Maple (North-West, pos=-8.5 8.5) -->
     <body name="tree_maple_nw" pos="-8.5 8.5 0">
-      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.3" size="1.15" material="tree_leaf_autumn"/>
-      <geom type="sphere" pos="-0.2 0.2 2.9" size="0.80" material="tree_leaf_autumn"/>
+      <geom type="cylinder" pos="0 0 1.0" size="0.18 1.0" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 1.8 0.4 0.4 2.5" size="0.09" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 1.8 -0.4 -0.3 2.5" size="0.09" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 2.9" size="1.20 1.20 0.90" material="tree_leaf_autumn"/>
+      <geom type="ellipsoid" pos="0.4 0.3 2.8" size="0.80 0.80 0.65" material="tree_leaf_autumn"/>
+      <geom type="ellipsoid" pos="-0.3 -0.3 2.7" size="0.75 0.75 0.60" material="tree_leaf_autumn"/>
     </body>
 
-    <!-- Tree 3: Deep Forest Oak (pos=8.5 -8.5) -->
+    <!-- TREE 3: Deep Forest Oak (South-East, pos=8.5 -8.5) -->
     <body name="tree_oak_se" pos="8.5 -8.5 0">
-      <geom type="cylinder" pos="0 0 1.2" size="0.15 1.2" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.4" size="1.1" material="tree_leaf_dark"/>
-      <geom type="sphere" pos="-0.2 -0.2 3.1" size="0.75" material="tree_leaf_mat"/>
+      <geom type="cylinder" pos="0 0 1.1" size="0.19 1.1" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 1.9 0.4 -0.4 2.6" size="0.09" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0 0 1.9 -0.4 0.3 2.5" size="0.09" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 3.1" size="1.20 1.20 0.90" material="tree_leaf_dark"/>
+      <geom type="ellipsoid" pos="-0.4 0.3 2.8" size="0.80 0.80 0.65" material="tree_leaf_mat"/>
+      <geom type="ellipsoid" pos="0.4 -0.3 2.8" size="0.80 0.80 0.65" material="tree_leaf_dark"/>
     </body>
 
-    <!-- Tree 4: Slender Italian Cypress (pos=-8.5 -8.5) -->
-    <body name="tree_cypress_sw" pos="-8.5 -8.5 0">
-      <geom type="cylinder" pos="0 0 0.8" size="0.12 0.8" material="tree_trunk_mat"/>
-      <geom type="ellipsoid" pos="0 0 2.4" size="0.55 0.55 1.6" material="tree_leaf_cypress"/>
+    <!-- TREE 4: Royal Plaza Palm Tree (South-West, pos=-8.5 -8.5) -->
+    <body name="tree_palm_sw" pos="-8.5 -8.5 0">
+      <!-- Curved Ringed Palm Trunk -->
+      <geom type="capsule" fromto="0 0 0 0.1 0.1 1.6" size="0.14" material="tree_trunk_mat"/>
+      <geom type="capsule" fromto="0.1 0.1 1.6 0.15 0.15 3.0" size="0.12" material="tree_trunk_mat"/>
+      <!-- Radiating Arching Palm Fronds -->
+      <geom type="capsule" fromto="0.15 0.15 3.0 1.4 0.15 2.6" size="0.06" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 -1.1 0.15 2.6" size="0.06" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 0.15 1.4 2.6" size="0.06" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 0.15 -1.1 2.6" size="0.06" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 1.0 1.0 2.5" size="0.055" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 -0.8 0.9 2.5" size="0.055" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 0.9 -0.8 2.5" size="0.055" material="palm_frond_mat"/>
+      <geom type="capsule" fromto="0.15 0.15 3.0 -0.8 -0.8 2.5" size="0.055" material="palm_frond_mat"/>
     </body>
 
-    <!-- Extended Boulevard Trees along the Avenue Canyons -->
+    <!-- Extended Boulevard Avenue Trees -->
     <body name="tree_5" pos="8.5 19.0 0">
-      <geom type="cylinder" pos="0 0 1.2" size="0.15 1.2" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.6" size="1.1" material="tree_leaf_mat"/>
+      <geom type="cylinder" pos="0 0 1.1" size="0.18 1.1" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 2.9" size="1.15 1.15 0.9" material="tree_leaf_mat"/>
     </body>
     <body name="tree_6" pos="-8.5 19.0 0">
-      <geom type="cylinder" pos="0 0 1.2" size="0.15 1.2" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.6" size="1.1" material="tree_leaf_dark"/>
+      <geom type="cylinder" pos="0 0 1.1" size="0.18 1.1" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 2.9" size="1.15 1.15 0.9" material="tree_leaf_dark"/>
     </body>
     <body name="tree_7" pos="19.0 8.5 0">
-      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
-      <geom type="sphere" pos="0 0 2.5" size="1.0" material="tree_leaf_autumn"/>
+      <geom type="cylinder" pos="0 0 1.0" size="0.17 1.0" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 2.8" size="1.1 1.1 0.85" material="tree_leaf_autumn"/>
     </body>
     <body name="tree_8" pos="-19.0 8.5 0">
-      <geom type="cylinder" pos="0 0 1.1" size="0.14 1.1" material="tree_trunk_mat"/>
-      <geom type="ellipsoid" pos="0 0 2.5" size="0.55 0.55 1.5" material="tree_leaf_cypress"/>
+      <geom type="cylinder" pos="0 0 1.0" size="0.16 1.0" material="tree_trunk_mat"/>
+      <geom type="ellipsoid" pos="0 0 2.7" size="0.6 0.6 1.6" material="tree_leaf_cypress"/>
     </body>
 
     <!-- ================================================================= -->
-    <!-- THE ADAPT-X SELF-HEALING ENTERPRISE QUADCOPTER DRONE -->
+    <!-- THE ADAPT-X ENTERPRISE QUADCOPTER DRONE WITH HIGH-SPEED ROTORS -->
     <!-- ================================================================= -->
     <body name="drone" pos="0.0 0.0 4.5">
       <freejoint name="drone_root"/>
@@ -474,6 +658,8 @@
         <geom name="prop_hub_fr" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
         <geom name="prop_fr_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_front_mat"/>
         <geom name="prop_fr_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_front_mat"/>
+        <!-- High-Speed Realistic Spinning Propeller Motion Blur Disc -->
+        <geom name="prop_blur_fr" type="cylinder" pos="0 0 0.003" size="0.12 0.002" mass="0.0001" material="rotor_blur_fr"/>
       </body>
 
       <!-- ================= ROTOR ARM 2: FRONT-LEFT (+X, +Y) ================= -->
@@ -487,6 +673,8 @@
         <geom name="prop_hub_fl" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
         <geom name="prop_fl_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_front_mat"/>
         <geom name="prop_fl_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_front_mat"/>
+        <!-- High-Speed Realistic Spinning Propeller Motion Blur Disc -->
+        <geom name="prop_blur_fl" type="cylinder" pos="0 0 0.003" size="0.12 0.002" mass="0.0001" material="rotor_blur_fl"/>
       </body>
 
       <!-- ================= ROTOR ARM 3: REAR-RIGHT (-X, -Y) ================= -->
@@ -500,6 +688,8 @@
         <geom name="prop_hub_rr" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
         <geom name="prop_rr_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_rear_mat"/>
         <geom name="prop_rr_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_rear_mat"/>
+        <!-- High-Speed Realistic Spinning Propeller Motion Blur Disc -->
+        <geom name="prop_blur_rr" type="cylinder" pos="0 0 0.003" size="0.12 0.002" mass="0.0001" material="rotor_blur_rr"/>
       </body>
 
       <!-- ================= ROTOR ARM 4: REAR-LEFT (-X, +Y) ================= -->
@@ -513,6 +703,8 @@
         <geom name="prop_hub_rl" type="cylinder" size="0.01 0.006" mass="0.0005" material="prop_hub_mat"/>
         <geom name="prop_rl_b1" type="box" size="0.11 0.014 0.002" mass="0.0005" material="rotor_rear_mat"/>
         <geom name="prop_rl_b2" type="box" size="0.014 0.11 0.002" mass="0.0005" material="rotor_rear_mat"/>
+        <!-- High-Speed Realistic Spinning Propeller Motion Blur Disc -->
+        <geom name="prop_blur_rl" type="cylinder" pos="0 0 0.003" size="0.12 0.002" mass="0.0001" material="rotor_blur_rl"/>
       </body>
 
       <site name="drone_imu" pos="0 0 0"/>

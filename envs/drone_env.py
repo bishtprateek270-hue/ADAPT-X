@@ -82,6 +82,11 @@ class CityDroneEnv(gym.Env):
             except Exception:
                 pass
         self.prop_angles = np.zeros(4, dtype=np.float32)
+        self.prop_blur_names = ["prop_blur_fr", "prop_blur_fl", "prop_blur_rr", "prop_blur_rl"]
+        self.prop_blur_geom_ids = [
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            for name in self.prop_blur_names
+        ]
 
         # Adaptive Temporal History Buffer (RMA Architecture)
         self.history_len = 20
@@ -181,12 +186,24 @@ class CityDroneEnv(gym.Env):
         actual_thrust = action * self.rotor_health
         self.data.ctrl[:] = actual_thrust
 
-        # Animate propeller rotations: speed proportional to sqrt(thrust)
+        # Animate realistic high-speed propeller spinning and dynamic motion blur
         if len(self.prop_qpos_indices) == 4:
-            spin_rates = self.prop_spin_dirs * np.sqrt(np.maximum(0.0, actual_thrust) / 3.5) * 80.0
             for i in range(4):
-                self.prop_angles[i] = float((self.prop_angles[i] + spin_rates[i] * 0.02) % (2.0 * np.pi))
-                self.data.qpos[self.prop_qpos_indices[i]] = self.prop_angles[i]
+                thrust_i = float(actual_thrust[i])
+                blur_gid = self.prop_blur_geom_ids[i] if i < len(self.prop_blur_geom_ids) else -1
+                if thrust_i > 0.4:
+                    # High-RPM realistic rotation rate (non-harmonic increment to prevent 50Hz stroboscopic aliasing)
+                    spin_speed = self.prop_spin_dirs[i] * (np.sqrt(thrust_i / 3.5) * 190.0 + 65.0)
+                    self.prop_angles[i] = float((self.prop_angles[i] + spin_speed * 0.02) % (2.0 * np.pi))
+                    self.data.qpos[self.prop_qpos_indices[i]] = self.prop_angles[i]
+                    # Dynamic motion blur rotor disc opacity proportional to throttle
+                    if blur_gid != -1:
+                        blur_alpha = float(np.clip(0.40 + 0.35 * (thrust_i / 3.5), 0.20, 0.78))
+                        self.model.geom_rgba[blur_gid][3] = blur_alpha
+                else:
+                    # Motor cut: blade stopped, blur disc hidden
+                    if blur_gid != -1:
+                        self.model.geom_rgba[blur_gid][3] = 0.0
 
         # Apply realistic aerodynamic translational and rotational air damping
         vel = self.data.qvel[0:3]

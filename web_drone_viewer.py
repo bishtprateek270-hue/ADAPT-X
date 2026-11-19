@@ -184,9 +184,10 @@ class SimulationWorker:
         self.kd_z = 9.5
         self.kp_pos = 3.0
         self.kd_pos = 2.0
-        self.kp_att = 4.2
-        self.kd_att = 0.55
+        self.kp_att = 4.8
+        self.kd_att = 0.60
         self.step_count = 0
+        self.fountain_crown_id = mujoco.mj_name2id(self.env.model, mujoco.mjtObj.mjOBJ_GEOM, "fountain_jet_crown")
 
         self.telemetry = {
             "altitude": 4.5,
@@ -381,7 +382,7 @@ class SimulationWorker:
                 # UNIFIED MISSION WAYPOINT PLANNER & HOVER LOCK SYSTEM
                 # -------------------------------------------------------------
                 is_damaged = (self.damage_motor != "none")
-                cruise_speed = 1.9 if is_damaged else 2.5
+                cruise_speed = 2.0 if is_damaged else 3.2
                 is_hover_locked = False
 
                 # Check if waypoint list is empty or ended
@@ -447,14 +448,14 @@ class SimulationWorker:
                     dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
 
                     u_dir = diff_xy / (dist_xy + 1e-5)
-                    desired_speed = min(cruise_speed, max(0.40, 0.95 * np.sqrt(dist_xy)))
+                    desired_speed = min(cruise_speed, max(0.45, 1.15 * np.sqrt(dist_xy)))
                     vx_des = u_dir[0] * desired_speed
                     vy_des = u_dir[1] * desired_speed
                     z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
                     vz_des = 0.0
 
-                    ax_req = 1.35 * (target_wp[0] - curr_pos[0]) + 0.95 * (vx_des - curr_vel[0])
-                    ay_req = 1.35 * (target_wp[1] - curr_pos[1]) + 0.95 * (vy_des - curr_vel[1])
+                    ax_req = 1.45 * (target_wp[0] - curr_pos[0]) + 1.05 * (vx_des - curr_vel[0])
+                    ay_req = 1.45 * (target_wp[1] - curr_pos[1]) + 1.05 * (vy_des - curr_vel[1])
                     psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
 
                     if is_damaged:
@@ -502,11 +503,11 @@ class SimulationWorker:
                     ax_b =  cos_psi * ax_req + sin_psi * ay_req
                     ay_b = -sin_psi * ax_req + cos_psi * ay_req
 
-                    pitch_des = float(np.clip( ax_b / 9.81, -0.32, 0.32))
-                    roll_des  = float(np.clip(-ay_b / 9.81, -0.32, 0.32))
+                    pitch_des = float(np.clip( ax_b / 9.81, -0.55, 0.55))
+                    roll_des  = float(np.clip(-ay_b / 9.81, -0.55, 0.55))
 
                     yaw_err = (psi_des - curr_yaw + np.pi) % (2.0 * np.pi) - np.pi
-                    tau_yaw = 0.90 * yaw_err - 0.35 * wz
+                    tau_yaw = 1.35 * yaw_err - 0.45 * wz
 
                     ez = z_des - curr_pos[2]
                     fz_nominal = self.env.mass * 9.81
@@ -545,6 +546,14 @@ class SimulationWorker:
                     self.env.reset_adaptive()
                     if self.damage_motor != "none":
                         self.env.inject_rotor_fault("dead_motor", rotor=self.damage_motor)
+
+                # Dynamically animate the plaza fountain water geyser & sparkling spray
+                fountain_crown_id = getattr(self, "fountain_crown_id", -1)
+                if fountain_crown_id != -1:
+                    wave = np.sin(self.step_count * 0.18)
+                    self.env.model.geom_pos[fountain_crown_id][2] = 3.35 + 0.10 * wave
+                    self.env.model.geom_size[fountain_crown_id][0] = 0.32 + 0.03 * np.cos(self.step_count * 0.24)
+                    self.env.model.geom_size[fountain_crown_id][1] = 0.32 + 0.03 * np.cos(self.step_count * 0.24)
 
                 # Dynamically frame camera behind current flight heading
                 self._update_camera(curr_yaw)
