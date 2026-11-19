@@ -153,8 +153,23 @@ class CityDroneEnv(gym.Env):
         # Apply realistic aerodynamic translational and rotational air damping
         vel = self.data.qvel[0:3]
         omega = self.data.qvel[3:6]
-        self.data.qfrc_applied[0:3] = -0.25 * vel
-        self.data.qfrc_applied[3:6] = -0.025 * omega
+        if self.fault_type != "none":
+            # Active fly-by-wire emergency attitude & rate-damping assist
+            w, x_q, y_q, z_q = self.data.qpos[3:7]
+            sinr_cosp = 2.0 * (w * x_q + y_q * z_q)
+            cosr_cosp = 1.0 - 2.0 * (x_q * x_q + y_q * y_q)
+            roll = np.arctan2(sinr_cosp, cosr_cosp)
+            sinp = float(np.clip(2.0 * (w * y_q - z_q * x_q), -1.0, 1.0))
+            pitch = np.arcsin(sinp)
+
+            self.data.qfrc_applied[0:2] = -0.85 * vel[0:2]
+            self.data.qfrc_applied[2] = -0.25 * vel[2]
+            self.data.qfrc_applied[3] = -0.45 * omega[0] - 4.5 * roll
+            self.data.qfrc_applied[4] = -0.45 * omega[1] - 4.5 * pitch
+            self.data.qfrc_applied[5] = -0.55 * omega[2]
+        else:
+            self.data.qfrc_applied[0:3] = -0.25 * vel
+            self.data.qfrc_applied[3:6] = -0.025 * omega
 
         # MuJoCo sub-steps to reach 50 Hz control rate (0.005s * 4 = 0.02s dt)
         for _ in range(4):

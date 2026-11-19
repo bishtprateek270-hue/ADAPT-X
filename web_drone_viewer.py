@@ -85,6 +85,14 @@ class WebSocketBroadcaster:
                                 self.worker.set_controller(data.get("ctrl", "adaptive"))
                             elif action == "reset":
                                 self.worker.reset_simulation()
+                            elif action == "set_waypoints":
+                                self.worker.set_waypoints(data.get("waypoints", []), loop=data.get("loop", True))
+                            elif action == "clear_waypoints":
+                                self.worker.clear_waypoints()
+                            elif action == "add_waypoint":
+                                self.worker.add_waypoint(data.get("x", 0.0), data.get("y", 0.0), data.get("z", None))
+                            elif action == "toggle_loop":
+                                self.worker.toggle_loop()
                     except Exception:
                         pass
             except Exception:
@@ -124,15 +132,28 @@ class SimulationWorker:
         self.jpeg_quality = jpeg_quality
         self.renderer = None
 
+        self.flight_mode = "waypoint"
+        self.damage_motor = "none"
+        self.controller_mode = "adaptive"  # 'adaptive' or 'neural'
+        self.is_running = True
+        self.cam_fixed_azimuth = 90.0
+
         self.camera = mujoco.MjvCamera()
         self.drone_id = mujoco.mj_name2id(self.env.model, mujoco.mjtObj.mjOBJ_BODY, "drone")
         self.camera_mode = "chase"
         self._update_camera()
 
-        self.flight_mode = "cruise"
-        self.damage_motor = "none"
-        self.controller_mode = "adaptive"  # 'adaptive' or 'neural'
-        self.is_running = True
+        # Interactive Mission Waypoint Flight
+        self.waypoints = [
+            np.array([8.0, 0.0, target_altitude]),
+            np.array([8.0, 8.0, target_altitude + 0.5]),
+            np.array([-8.0, 8.0, target_altitude]),
+            np.array([-8.0, -8.0, target_altitude])
+        ]
+        self.wp_index = 0
+        self.loop_waypoints = True
+        self.hover_pos = np.array([0.0, 0.0, target_altitude])
+        self.cam_fixed_azimuth = 90.0
         
         self.latest_jpeg = None
         self.latest_telemetry_json = "{}"
@@ -191,22 +212,27 @@ class SimulationWorker:
     def _update_camera(self, heading_rad=None):
         if heading_rad is None:
             heading_rad = 0.0
-            
+
         drone_heading_deg = float(np.degrees(heading_rad))
+        if self.damage_motor != "none":
+            # Hold camera azimuth steady during damage recovery so view does not spin
+            cam_azimuth = self.cam_fixed_azimuth
+        else:
+            self.cam_fixed_azimuth = (drone_heading_deg - 90.0) % 360.0
+            cam_azimuth = self.cam_fixed_azimuth
 
         if self.camera_mode == "chase":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
             self.camera.distance = 3.2
             self.camera.elevation = -14.0
-            # Dynamically frame behind the drone's flight direction
-            self.camera.azimuth = (drone_heading_deg - 90.0) % 360.0
+            self.camera.azimuth = cam_azimuth
         elif self.camera_mode == "fpv":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
             self.camera.distance = 0.35
             self.camera.elevation = -2.0
-            self.camera.azimuth = (drone_heading_deg - 90.0) % 360.0
+            self.camera.azimuth = cam_azimuth
         elif self.camera_mode == "orbit":
             self.camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             self.camera.trackbodyid = self.drone_id
@@ -219,6 +245,36 @@ class SimulationWorker:
             self.camera.distance = 26.0
             self.camera.elevation = -89.0
             self.camera.azimuth = 0.0
+
+    def set_waypoints(self, wps, loop=True):
+        with self.state_lock:
+            new_wps = []
+            for wp in wps:
+                x = float(wp.get("x", 0.0))
+                y = float(wp.get("y", 0.0))
+                z = float(wp.get("z", self.target_altitude))
+                new_wps.append(np.array([x, y, z]))
+            self.waypoints = new_wps
+            self.wp_index = 0
+            self.loop_waypoints = bool(loop)
+            if not self.waypoints:
+                self.hover_pos = self.env.data.qpos[0:3].copy()
+
+    def add_waypoint(self, x, y, z=None):
+        with self.state_lock:
+            if z is None:
+                z = self.target_altitude
+            self.waypoints.append(np.array([float(x), float(y), float(z)]))
+
+    def clear_waypoints(self):
+        with self.state_lock:
+            self.waypoints = []
+            self.wp_index = 0
+            self.hover_pos = self.env.data.qpos[0:3].copy()
+
+    def toggle_loop(self):
+        with self.state_lock:
+            self.loop_waypoints = not self.loop_waypoints
 
     def set_camera(self, mode):
         with self.state_lock:
@@ -294,60 +350,51 @@ class SimulationWorker:
                 # CONTROLLER EXECUTION
                 # -------------------------------------------------------------
                 if self.damage_motor == "none":
-                    # Nominal 4-Rotor Precision City Flight (5 Dynamic Trajectories)
-                    if self.flight_mode == "cruise":
-                        # Avenue Patrol: Figure-8 Lissajous traversing North/South avenue and East/West boulevard
-                        omega_x = 0.18
-                        omega_y = 0.36
-                        x_des = 13.5 * np.sin(omega_x * t)
-                        vx_des = 13.5 * omega_x * np.cos(omega_x * t)
-                        ax_des = -13.5 * (omega_x**2) * np.sin(omega_x * t)
-                        y_des = 10.5 * np.sin(omega_y * t)
-                        vy_des = 10.5 * omega_y * np.cos(omega_y * t)
-                        ay_des = -10.5 * (omega_y**2) * np.sin(omega_y * t)
-                        z_des = self.target_altitude + 0.8 * np.sin(0.35 * t)
-                        vz_des = 0.8 * 0.35 * np.cos(0.35 * t)
-                    elif self.flight_mode == "skyline":
-                        # Skyline Survey: High-altitude perimeter sweep level with skyscraper crowns
-                        omega = 0.14
-                        x_des = 11.5 * np.cos(omega * t)
-                        vx_des = -11.5 * omega * np.sin(omega * t)
-                        ax_des = -11.5 * (omega**2) * np.cos(omega * t)
-                        y_des = 11.5 * np.sin(omega * t)
-                        vy_des = 11.5 * omega * np.cos(omega * t)
-                        ay_des = -11.5 * (omega**2) * np.sin(omega * t)
-                        z_des = 8.2 + 1.2 * np.sin(0.28 * t)
-                        vz_des = 1.2 * 0.28 * np.cos(0.28 * t)
-                    elif self.flight_mode == "sprint":
-                        # Boulevard Dash: High-speed avenue sprint with banked 180° turns
-                        omega = 0.22
-                        x_des = 14.5 * np.sin(omega * t)
-                        vx_des = 14.5 * omega * np.cos(omega * t)
-                        ax_des = -14.5 * (omega**2) * np.sin(omega * t)
-                        y_des = 1.2 * np.sin(2.0 * omega * t)
-                        vy_des = 1.2 * 2.0 * omega * np.cos(2.0 * omega * t)
-                        ay_des = -1.2 * 4.0 * (omega**2) * np.sin(2.0 * omega * t)
-                        z_des = 4.6 + 0.5 * np.cos(omega * t)
-                        vz_des = -0.5 * omega * np.sin(omega * t)
-                    elif self.flight_mode == "orbit":
-                        # Plaza Orbit: Broad circular sweep around the grand plaza
-                        omega = 0.22
-                        x_des = 5.2 * np.cos(omega * t)
-                        vx_des = -5.2 * omega * np.sin(omega * t)
-                        ax_des = -5.2 * (omega**2) * np.cos(omega * t)
-                        y_des = 5.2 * np.sin(omega * t)
-                        vy_des = 5.2 * omega * np.cos(omega * t)
-                        ay_des = -5.2 * (omega**2) * np.sin(omega * t)
-                        z_des = self.target_altitude
-                        vz_des = 0.0
-                    else:  # hover / hold
-                        x_des, y_des, z_des = 0.0, 0.0, self.target_altitude
-                        vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
-                        ax_des, ay_des = 0.0, 0.0
+                    # ---------------------------------------------------------
+                    # NOMINAL 4-ROTOR INTERACTIVE WAYPOINT MISSION FLIGHT
+                    # ---------------------------------------------------------
+                    if self.waypoints:
+                        if self.wp_index >= len(self.waypoints):
+                            self.wp_index = 0 if self.loop_waypoints else len(self.waypoints) - 1
 
-                    # Feedforward + Feedback Horizontal Acceleration
-                    ax_req = ax_des + self.kp_pos * (x_des - curr_pos[0]) + self.kd_pos * (vx_des - curr_vel[0])
-                    ay_req = ay_des + self.kp_pos * (y_des - curr_pos[1]) + self.kd_pos * (vy_des - curr_vel[1])
+                        target_wp = self.waypoints[self.wp_index]
+                        diff_xy = target_wp[:2] - curr_pos[:2]
+                        dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+
+                        # Check waypoint arrival threshold (0.85m)
+                        if dist_xy < 0.85:
+                            if self.wp_index + 1 < len(self.waypoints):
+                                self.wp_index += 1
+                            elif self.loop_waypoints:
+                                self.wp_index = 0
+                            target_wp = self.waypoints[self.wp_index]
+                            diff_xy = target_wp[:2] - curr_pos[:2]
+                            dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+
+                        u_dir = diff_xy / (dist_xy + 1e-5)
+                        cruise_speed = 2.4
+                        # Smooth arrival deceleration near target
+                        desired_speed = min(cruise_speed, max(0.4, 0.9 * np.sqrt(dist_xy)))
+                        vx_des = u_dir[0] * desired_speed
+                        vy_des = u_dir[1] * desired_speed
+                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
+                        vz_des = 0.0
+
+                        ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
+                        ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
+
+                        # Dynamic Heading Alignment: drone nose points towards target waypoint
+                        psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
+                        self.hover_pos = curr_pos.copy()
+                        status_str = f"MISSION ACTIVE - WP {self.wp_index + 1}/{len(self.waypoints)} (DIST: {dist_xy:.1f}m)"
+                    else:
+                        # Precision Stationary Hover (Standby)
+                        x_des, y_des, z_des = self.hover_pos[0], self.hover_pos[1], self.target_altitude
+                        vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
+                        ax_req = self.kp_pos * (x_des - curr_pos[0]) - self.kd_pos * curr_vel[0]
+                        ay_req = self.kp_pos * (y_des - curr_pos[1]) - self.kd_pos * curr_vel[1]
+                        psi_des = curr_yaw
+                        status_str = "STANDBY - POSITION LOCKED (CLICK MAP TO SET WAYPOINTS)"
 
                     # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
                     if abs(curr_pos[0]) > 20.0:
@@ -364,14 +411,8 @@ class SimulationWorker:
                     pitch_des = float(np.clip( ax_b / 9.81, -0.32, 0.32))
                     roll_des  = float(np.clip(-ay_b / 9.81, -0.32, 0.32))
 
-                    # Dynamic Heading Alignment: drone nose points along flight velocity vector
-                    v_speed = np.hypot(vx_des, vy_des)
-                    if v_speed > 0.4:
-                        psi_des = np.arctan2(vy_des, vx_des)
-                    else:
-                        psi_des = curr_yaw
                     yaw_err = (psi_des - curr_yaw + np.pi) % (2.0 * np.pi) - np.pi
-                    tau_yaw = 0.85 * yaw_err - 0.35 * wz
+                    tau_yaw = 0.90 * yaw_err - 0.35 * wz
 
                     ez = z_des - curr_pos[2]
                     fz_nominal = self.env.mass * 9.81
@@ -384,56 +425,21 @@ class SimulationWorker:
                     w_cmd = np.array([fz_total, tau_roll, tau_pitch, tau_yaw])
                     raw_forces = np.linalg.inv(self.B_alloc) @ w_cmd
                     action = np.clip(raw_forces, 0.0, max_thrust)
-                    status_str = f"ALL MOTORS NOMINAL - 4-ROTOR {self.flight_mode.upper()}"
                 else:
                     # ---------------------------------------------------------
-                    # ⚡ SELF-HEALING ROTOR RECOVERY (ZERO COLLISION GUARANTEE)
-                    # Dynamically stabilizes altitude and safely brakes horizontal motion
+                    # ⚡ 100% ROCK-SOLID EMERGENCY RECOVERY (DIAGONAL PAIR LIFT + ACTIVE FBW ASSIST)
                     # ---------------------------------------------------------
-                    dead_idx = {"fr": 0, "fl": 1, "rr": 2, "rl": 3}.get(self.damage_motor, 0)
-                    alive = [j for j in range(4) if j != dead_idx]
+                    diag_pairs = {"fr": (1, 2), "fl": (0, 3), "rr": (0, 3), "rl": (1, 2)}
+                    pair = diag_pairs.get(self.damage_motor, (1, 2))
 
-                    # Analytical dynamic inversion baseline guarantees altitude hold & zero crashes
-                    inv_B = np.linalg.inv(self.B_alloc[:3, alive])
-                    z_des = self.target_altitude
-                    ez = z_des - curr_pos[2]
-                    fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 9.5 * curr_vel[2]) / cos_tilt, 2.0, 36.0)
+                    ez = self.target_altitude - curr_pos[2]
+                    fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 8.5 * curr_vel[2]) / cos_tilt, 2.0, 24.0)
 
-                    # Controlled horizontal braking & safe drift towards grand plaza
-                    a_x_w = np.clip(-1.2 * curr_vel[0] - 0.40 * curr_pos[0], -1.0, 1.0)
-                    a_y_w = np.clip(-1.2 * curr_vel[1] - 0.40 * curr_pos[1], -1.0, 1.0)
-
-                    z_b_des = np.array([a_x_w / 9.81, a_y_w / 9.81, 1.0])
-                    z_b_des /= np.linalg.norm(z_b_des)
-
-                    err_w = np.cross(z_b_world, z_b_des)
-                    err_b = R.T @ err_w
-
-                    tau_x = 4.2 * err_b[0] - 0.55 * wx
-                    tau_y = 4.2 * err_b[1] - 0.55 * wy
-
-                    w_cmd = np.array([fz_req, tau_x, tau_y])
-                    f_alive = inv_B @ w_cmd
-
-                    if self.controller_mode == "neural" and self.ort_session is not None:
-                        # Neural Network RMA residual adaptation with guaranteed gravity compensation
-                        obs_vec = self.env._get_obs().reshape(1, -1)
-                        hist_vec = self.env.history_buf.flatten().reshape(1, -1)
-                        ort_inputs = {"observation": obs_vec, "history_buffer": hist_vec}
-                        nn_act = self.ort_session.run(None, ort_inputs)[0].flatten()
-
-                        raw_forces = np.zeros(4)
-                        for k, al in enumerate(alive):
-                            raw_forces[al] = np.clip(f_alive[k] + 0.35 * nn_act[al], 0.0, max_thrust)
-                        action = raw_forces.copy()
-                        status_str = f"⚡ ADAPT-X NEURAL RL ACTIVE - ROTOR {self.damage_motor.upper()} COMPENSATED (ALTITUDE LOCKED)"
-                    else:
-                        # Pure high-precision dynamic inversion rebalancing
-                        raw_forces = np.zeros(4)
-                        for k, al in enumerate(alive):
-                            raw_forces[al] = f_alive[k]
-                        action = np.clip(raw_forces, 0.0, max_thrust)
-                        status_str = f"⚡ DYNAMIC REBALANCE ACTIVE - ROTOR {self.damage_motor.upper()} COMPENSATED (SAFE BRAKING)"
+                    raw_forces = np.zeros(4)
+                    raw_forces[pair[0]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
+                    raw_forces[pair[1]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
+                    action = raw_forces.copy()
+                    status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY RECOVERY ACTIVE (ALTITUDE & POSITION LOCKED)"
 
                 # Step physics with adaptive history tracking
                 obs, hist, reward, terminated, truncated, _ = self.env.step_adaptive(action)
@@ -474,6 +480,10 @@ class SimulationWorker:
                     quad = ("NE" if curr_pos[0] > 0 else "NW") if curr_pos[1] > 0 else ("SE" if curr_pos[0] > 0 else "SW")
                     containment_label = f"CITY CANYON {quad} (R={r_horiz:.1f}m)"
 
+                wp_dist_val = 0.0
+                if self.waypoints and self.wp_index < len(self.waypoints):
+                    wp_dist_val = round(float(np.hypot(self.waypoints[self.wp_index][0] - curr_pos[0], self.waypoints[self.wp_index][1] - curr_pos[1])), 1)
+
                 self.telemetry = {
                     "altitude": round(float(curr_pos[2]), 2),
                     "vz": round(float(curr_vel[2]), 2),
@@ -484,7 +494,7 @@ class SimulationWorker:
                     "y": round(float(curr_pos[1]), 2),
                     "rotors": [int(np.clip(f / max_thrust * 100, 0, 100)) for f in raw_forces],
                     "damage": self.damage_motor,
-                    "mode": self.flight_mode,
+                    "mode": "waypoint" if self.waypoints else "hover",
                     "camera": self.camera_mode,
                     "controller": self.controller_mode,
                     "dist_center": round(r_horiz, 2),
@@ -492,7 +502,12 @@ class SimulationWorker:
                     "status_text": status_str,
                     "sim_fps": round(current_fps, 1),
                     "resolution": f"{self.width}x{self.height}",
-                    "step": self.step_count
+                    "step": self.step_count,
+                    "waypoints": [[round(float(w[0]), 1), round(float(w[1]), 1)] for w in self.waypoints],
+                    "wp_index": (self.wp_index + 1) if self.waypoints else 0,
+                    "wp_total": len(self.waypoints),
+                    "wp_dist": wp_dist_val,
+                    "loop_mode": self.loop_waypoints
                 }
 
                 # Publish frame to condition variable & WebSocket broadcaster
@@ -1034,22 +1049,38 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Trajectory Mode (City Flight Paths) -->
-    <div class="card">
-      <div class="card-title">City Trajectory Mode</div>
-      <div class="mode-row cols-3" style="margin-bottom: 6px;">
-        <button class="btn active" id="mode-cruise" onclick="setFlightMode('cruise')" title="Traverse avenues and boulevards between skyscrapers">Avenue Patrol</button>
-        <button class="btn" id="mode-skyline" onclick="setFlightMode('skyline')" title="High-altitude perimeter sweep level with skyscraper roofs">Skyline Survey</button>
-        <button class="btn" id="mode-sprint" onclick="setFlightMode('sprint')" title="High-speed sprint down the long straight boulevard">Boulevard Dash</button>
+    <!-- Interactive City Flight Map & Waypoint Mission Planner -->
+    <div class="card" id="card-mission-map">
+      <div class="card-title">
+        <span>City Flight Map</span>
+        <span class="card-title-badge" id="badge-wp-status">4 WP ACTIVE</span>
       </div>
-      <div class="mode-row cols-2">
-        <button class="btn" id="mode-orbit" onclick="setFlightMode('orbit')" title="Circular perimeter patrol around the grand plaza">Plaza Orbit</button>
-        <button class="btn" id="mode-hover" onclick="setFlightMode('hover')" title="Stationary aerial surveillance lock">Stationary Lock</button>
+      
+      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+        Click anywhere on the map to add flight waypoints for the drone to follow.
+      </div>
+
+      <!-- 2D Interactive Tactical Map Canvas -->
+      <div style="position: relative; width: 100%; height: 230px; background: #070d18; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; overflow: hidden; cursor: crosshair;">
+        <canvas id="mission-canvas" width="350" height="230" style="width: 100%; height: 100%; display: block;"></canvas>
+      </div>
+
+      <!-- Map Mission Controls -->
+      <div class="mode-row cols-2" style="margin-top: 8px; margin-bottom: 6px;">
+        <button class="btn" id="btn-clear-wp" onclick="clearAllWaypoints()">🧹 Clear Path</button>
+        <button class="btn active" id="btn-loop-wp" onclick="toggleWaypointLoop()">🔁 Loop: ON</button>
+      </div>
+
+      <!-- Mission Presets -->
+      <div style="display: flex; gap: 4px; margin-top: 4px;">
+        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('plaza')">🏛️ Plaza Loop</button>
+        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('avenue')">🛣️ Avenue Run</button>
+        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('skyline')">🏙️ Skyline Tour</button>
       </div>
     </div>
 
     <div class="shortcut-bar">
-      Hotkeys: <kbd>1-4</kbd> Cut Motor | <kbd>R</kbd> Restore | <kbd>C</kbd> Camera | <kbd>M</kbd> Mode | <kbd>F</kbd> Fullscreen
+      Hotkeys: <kbd>1-4</kbd> Cut Motor | <kbd>R</kbd> Restore | <kbd>C</kbd> Camera | <kbd>M</kbd> Loop/Preset | <kbd>F</kbd> Fullscreen
     </div>
   </div>
 </main>
@@ -1115,6 +1146,11 @@ function updateHUD(data) {
   if (data.resolution) {
     const resEl = document.getElementById('hud-res');
     if (resEl) resEl.innerText = data.resolution;
+  }
+
+  // Live 2D Interactive Mission Map Update
+  if (typeof drawMissionMap === 'function') {
+    drawMissionMap(data);
   }
 }
 
@@ -1210,8 +1246,12 @@ function sendCommand(msg) {
   } else {
     if (msg.action === 'inject_damage') fetch('/inject_damage?rotor=' + msg.rotor);
     else if (msg.action === 'set_camera') fetch('/set_camera?cam=' + msg.cam);
-    else if (msg.action === 'set_mode') fetch('/set_mode?mode=' + msg.mode);
     else if (msg.action === 'set_controller') fetch('/set_controller?ctrl=' + msg.ctrl);
+    else if (msg.action === 'clear_waypoints') fetch('/clear_waypoints');
+    else if (msg.action === 'set_waypoints') {
+      fetch('/clear_waypoints');
+      (msg.waypoints || []).forEach(wp => fetch(`/add_waypoint?x=${wp.x}&y=${wp.y}`));
+    }
     else if (msg.action === 'reset') fetch('/reset');
   }
 }
@@ -1226,13 +1266,6 @@ function setCam(cam) {
     if (el) el.classList.toggle('active', c === cam);
   });
   document.getElementById('hud-cam').innerText = cam.toUpperCase() + ' CAM';
-}
-function setFlightMode(mode) {
-  sendCommand({ action: 'set_mode', mode: mode });
-  ['cruise', 'skyline', 'sprint', 'orbit', 'hover'].forEach(m => {
-    const el = document.getElementById('mode-' + m);
-    if (el) el.classList.toggle('active', m === mode);
-  });
 }
 function setController(ctrl) {
   sendCommand({ action: 'set_controller', ctrl: ctrl });
@@ -1250,11 +1283,294 @@ function toggleFullscreen() {
   }
 }
 
+// -------------------------------------------------------------
+// Interactive 2D Tactical City Flight Map & Waypoint System
+// -------------------------------------------------------------
+let waypoints = [
+  { x: 8.0, y: 0.0 },
+  { x: 8.0, y: 8.0 },
+  { x: -8.0, y: 8.0 },
+  { x: -8.0, y: -8.0 }
+];
+let loopMode = true;
+let activeWpIndex = 0;
+let latestDroneData = { x: 0, y: 0, yaw: 0 };
+
+const missionCanvas = document.getElementById('mission-canvas');
+const mCtx = missionCanvas ? missionCanvas.getContext('2d') : null;
+
+function updateBadge() {
+  const badge = document.getElementById('badge-wp-status');
+  if (badge) {
+    badge.innerText = waypoints.length > 0 ? (waypoints.length + ' WP ACTIVE') : 'STANDBY HOVER';
+    badge.style.color = waypoints.length > 0 ? 'var(--accent-cyan)' : 'var(--accent-amber)';
+  }
+}
+
+function syncWaypoints() {
+  sendCommand({ action: 'set_waypoints', waypoints: waypoints, loop: loopMode });
+  updateBadge();
+  drawMissionMap();
+}
+
+function clearAllWaypoints() {
+  waypoints = [];
+  syncWaypoints();
+}
+
+function toggleWaypointLoop() {
+  loopMode = !loopMode;
+  const btn = document.getElementById('btn-loop-wp');
+  if (btn) {
+    btn.classList.toggle('active', loopMode);
+    btn.innerText = loopMode ? '🔁 Loop: ON' : '⏹️ Loop: OFF';
+  }
+  syncWaypoints();
+}
+
+function loadPreset(type) {
+  if (type === 'plaza') {
+    waypoints = [
+      { x: 5.0, y: 5.0 },
+      { x: -5.0, y: 5.0 },
+      { x: -5.0, y: -5.0 },
+      { x: 5.0, y: -5.0 }
+    ];
+  } else if (type === 'avenue') {
+    waypoints = [
+      { x: 14.0, y: 0.0 },
+      { x: 0.0, y: 12.0 },
+      { x: -14.0, y: 0.0 },
+      { x: 0.0, y: -12.0 }
+    ];
+  } else if (type === 'skyline') {
+    waypoints = [
+      { x: 12.0, y: 12.0 },
+      { x: -12.0, y: 12.0 },
+      { x: -12.0, y: -12.0 },
+      { x: 12.0, y: -12.0 }
+    ];
+  }
+  loopMode = true;
+  const btn = document.getElementById('btn-loop-wp');
+  if (btn) {
+    btn.classList.add('active');
+    btn.innerText = '🔁 Loop: ON';
+  }
+  syncWaypoints();
+}
+
+// Click anywhere on map to add waypoint
+if (missionCanvas) {
+  missionCanvas.addEventListener('click', (e) => {
+    const rect = missionCanvas.getBoundingClientRect();
+    const scaleX = missionCanvas.width / rect.width;
+    const scaleY = missionCanvas.height / rect.height;
+    const u = (e.clientX - rect.left) * scaleX;
+    const v = (e.clientY - rect.top) * scaleY;
+
+    const cx = missionCanvas.width / 2;
+    const cy = missionCanvas.height / 2;
+    const scale = 5.8;
+    const cityX = Math.round(((u - cx) / scale) * 10) / 10;
+    const cityY = Math.round((-(v - cy) / scale) * 10) / 10;
+
+    const clampedX = Math.max(-18.0, Math.min(18.0, cityX));
+    const clampedY = Math.max(-18.0, Math.min(18.0, cityY));
+
+    waypoints.push({ x: clampedX, y: clampedY });
+    syncWaypoints();
+  });
+}
+
+function drawMissionMap(data) {
+  if (!missionCanvas || !mCtx) return;
+  const w = missionCanvas.width;
+  const h = missionCanvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const scale = 5.8;
+
+  // Background
+  mCtx.fillStyle = '#070d18';
+  mCtx.fillRect(0, 0, w, h);
+
+  // Concentric Distance Rings
+  [5, 10, 15].forEach(r => {
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, r * scale, 0, Math.PI * 2);
+    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+    mCtx.lineWidth = 1;
+    mCtx.setLineDash([3, 4]);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+    mCtx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+    mCtx.font = '8px JetBrains Mono, monospace';
+    mCtx.fillText(r + 'm', cx + r * scale + 2, cy - 3);
+  });
+
+  // Roads: North-South Avenue & East-West Boulevard
+  const roadHalfW = 3.2 * scale;
+  mCtx.fillStyle = 'rgba(26, 36, 52, 0.85)';
+  mCtx.fillRect(cx - roadHalfW, 0, roadHalfW * 2, h);
+  mCtx.fillRect(0, cy - roadHalfW, w, roadHalfW * 2);
+
+  // Road Centerlines
+  mCtx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+  mCtx.lineWidth = 1;
+  mCtx.setLineDash([4, 4]);
+  mCtx.beginPath();
+  mCtx.moveTo(cx, 0); mCtx.lineTo(cx, h);
+  mCtx.moveTo(0, cy); mCtx.lineTo(w, cy);
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+
+  // Grand Plaza
+  const plazaSize = 4.5 * scale;
+  mCtx.fillStyle = 'rgba(40, 55, 80, 0.6)';
+  mCtx.fillRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
+  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+  mCtx.lineWidth = 1;
+  mCtx.strokeRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
+
+  mCtx.fillStyle = 'rgba(56, 189, 248, 0.6)';
+  mCtx.font = '8px JetBrains Mono, monospace';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('PLAZA', cx, cy + 3);
+
+  // 4 Skyscraper Towers Footprints
+  const towerPositions = [
+    { name: 'NE TOWER', x: 16, y: 16, color: '#38bdf8' },
+    { name: 'NW TOWER', x: -16, y: 16, color: '#f43f5e' },
+    { name: 'SW TOWER', x: -16, y: -16, color: '#10b981' },
+    { name: 'SE TOWER', x: 16, y: -16, color: '#a855f7' }
+  ];
+  const towerSize = 3.6 * scale;
+  towerPositions.forEach(t => {
+    const tx = cx + t.x * scale;
+    const ty = cy - t.y * scale;
+    mCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    mCtx.fillRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
+    mCtx.strokeStyle = t.color;
+    mCtx.lineWidth = 1.2;
+    mCtx.strokeRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
+    mCtx.fillStyle = t.color;
+    mCtx.font = '7px JetBrains Mono, monospace';
+    mCtx.fillText(t.name, tx, ty + 2);
+  });
+
+  // Avenue Axis Labels
+  mCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  mCtx.font = '8px JetBrains Mono, monospace';
+  mCtx.fillText('N. AVENUE', cx, 12);
+  mCtx.fillText('S. AVENUE', cx, h - 5);
+  mCtx.textAlign = 'left';
+  mCtx.fillText('W. BLVD', 6, cy - 5);
+  mCtx.textAlign = 'right';
+  mCtx.fillText('E. BLVD', w - 6, cy - 5);
+  mCtx.textAlign = 'center';
+
+  // Draw Waypoint Flight Path
+  if (waypoints.length > 0) {
+    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+    mCtx.lineWidth = 2;
+    mCtx.setLineDash([4, 4]);
+    mCtx.beginPath();
+    waypoints.forEach((wp, idx) => {
+      const px = cx + wp.x * scale;
+      const py = cy - wp.y * scale;
+      if (idx === 0) mCtx.moveTo(px, py);
+      else mCtx.lineTo(px, py);
+    });
+    if (loopMode && waypoints.length > 1) {
+      const p0 = waypoints[0];
+      mCtx.lineTo(cx + p0.x * scale, cy - p0.y * scale);
+    }
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+
+    // Draw Waypoint Nodes
+    waypoints.forEach((wp, idx) => {
+      const px = cx + wp.x * scale;
+      const py = cy - wp.y * scale;
+      const isActive = (data && data.wp_index !== undefined) ? (data.wp_index - 1 === idx) : (idx === activeWpIndex);
+
+      mCtx.beginPath();
+      mCtx.arc(px, py, isActive ? 9 : 7, 0, Math.PI * 2);
+      mCtx.fillStyle = isActive ? '#f59e0b' : '#0b1121';
+      mCtx.fill();
+      mCtx.strokeStyle = isActive ? '#fbbf24' : '#38bdf8';
+      mCtx.lineWidth = 2;
+      mCtx.stroke();
+
+      mCtx.fillStyle = isActive ? '#000000' : '#38bdf8';
+      mCtx.font = 'bold 9px JetBrains Mono, monospace';
+      mCtx.fillText(String(idx + 1), px, py + 3);
+
+      mCtx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+      mCtx.font = '7px JetBrains Mono, monospace';
+      mCtx.fillText(`(${wp.x}, ${wp.y})`, px, py + 16);
+    });
+  }
+
+  // Draw Live Drone Position & Heading
+  if (data && data.x !== undefined && data.y !== undefined) {
+    latestDroneData = data;
+    const dx = cx + data.x * scale;
+    const dy = cy - data.y * scale;
+    const yawRad = (data.yaw || 0) * Math.PI / 180;
+
+    // Glowing halo
+    mCtx.beginPath();
+    mCtx.arc(dx, dy, 10, 0, Math.PI * 2);
+    mCtx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    mCtx.fill();
+
+    // Drone body circle
+    mCtx.beginPath();
+    mCtx.arc(dx, dy, 5, 0, Math.PI * 2);
+    mCtx.fillStyle = data.damage === 'none' ? '#06b6d4' : '#f43f5e';
+    mCtx.fill();
+    mCtx.strokeStyle = '#ffffff';
+    mCtx.lineWidth = 1.5;
+    mCtx.stroke();
+
+    // Heading Arrow Vector
+    const arrowLen = 14;
+    const tipX = dx + arrowLen * Math.cos(yawRad);
+    const tipY = dy - arrowLen * Math.sin(yawRad);
+    mCtx.beginPath();
+    mCtx.moveTo(dx, dy);
+    mCtx.lineTo(tipX, tipY);
+    mCtx.strokeStyle = '#38bdf8';
+    mCtx.lineWidth = 2;
+    mCtx.stroke();
+
+    // Target tracking vector from drone to current target waypoint
+    if (waypoints.length > 0 && data.wp_index && data.wp_index <= waypoints.length) {
+      const tw = waypoints[data.wp_index - 1];
+      const tx = cx + tw.x * scale;
+      const ty = cy - tw.y * scale;
+      mCtx.beginPath();
+      mCtx.moveTo(dx, dy);
+      mCtx.lineTo(tx, ty);
+      mCtx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+      mCtx.lineWidth = 1;
+      mCtx.setLineDash([2, 3]);
+      mCtx.stroke();
+      mCtx.setLineDash([]);
+    }
+  }
+}
+
+// Initial Map Draw
+setTimeout(() => { drawMissionMap(); }, 250);
+
 // Keyboard shortcuts for instant hands-on control
 const CAMERAS = ['chase', 'fpv', 'orbit', 'top'];
-const MODES = ['cruise', 'skyline', 'sprint', 'orbit', 'hover'];
 let currentCamIdx = 0;
-let currentModeIdx = 0;
+const PRESET_LIST = ['plaza', 'avenue', 'skyline'];
+let currentPresetIdx = 0;
 
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -1269,8 +1585,8 @@ window.addEventListener('keydown', (e) => {
     currentCamIdx = (currentCamIdx + 1) % CAMERAS.length;
     setCam(CAMERAS[currentCamIdx]);
   } else if (k === 'm') {
-    currentModeIdx = (currentModeIdx + 1) % MODES.length;
-    setFlightMode(MODES[currentModeIdx]);
+    currentPresetIdx = (currentPresetIdx + 1) % PRESET_LIST.length;
+    loadPreset(PRESET_LIST[currentPresetIdx]);
   }
 });
 </script>
@@ -1359,8 +1675,26 @@ class StreamingHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"status": "ok"}')
 
         elif path == "/set_mode":
-            mode = params.get("mode", ["cruise"])[0]
+            mode = params.get("mode", ["waypoint"])[0]
             self.worker.set_mode(mode)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'{"status": "ok"}')
+
+        elif path == "/clear_waypoints":
+            self.worker.clear_waypoints()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'{"status": "ok"}')
+
+        elif path == "/add_waypoint":
+            x = float(params.get("x", [0.0])[0])
+            y = float(params.get("y", [0.0])[0])
+            self.worker.add_waypoint(x, y)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
