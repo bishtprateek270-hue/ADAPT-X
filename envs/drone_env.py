@@ -91,7 +91,13 @@ class CityDroneEnv(gym.Env):
 
         # Urban Obstacle Map & Precise MuJoCo Collision Discovery
         self.obstacle_map = CityObstacleMap(drone_radius=0.45)
-        self.drone_geoms = {g for g in range(self.model.ngeom) if self.model.geom_bodyid[g] == self.drone_body_id}
+        drone_body_names = {"drone", "prop_fr", "prop_fl", "prop_rr", "prop_rl"}
+        self.drone_body_ids = {
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name)
+            for name in drone_body_names
+            if mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, name) != -1
+        }
+        self.drone_geoms = {g for g in range(self.model.ngeom) if self.model.geom_bodyid[g] in self.drone_body_ids}
         ground_names = {"ground", "grand_plaza_border", "grand_plaza_mosaic", "boulevard_ns", "boulevard_ew"}
         self.ground_geoms = {
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
@@ -194,12 +200,14 @@ class CityDroneEnv(gym.Env):
             sinp = float(np.clip(2.0 * (w * y_q - z_q * x_q), -1.0, 1.0))
             pitch = np.arcsin(sinp)
 
-            # Active FBW trajectory navigation guidance assist towards target velocity + APF obstacle repulsion
+            # Active FBW trajectory navigation guidance assist towards target position & velocity
+            p_target = getattr(self, "target_pos", np.zeros(3))
+            p_err = np.array([p_target[0] - self.data.qpos[0], p_target[1] - self.data.qpos[1]])
             v_target = getattr(self, "target_velocity", np.zeros(2))
             v_err = v_target - vel[0:2]
-            f_guidance = np.clip(3.5 * v_err, -7.0, 7.0)
+            f_guidance = np.clip(2.6 * p_err + 3.2 * v_err, -8.0, 8.0)
 
-            # Active APF building wall repulsion in damaged mode
+            # Active APF building wall repulsion in damaged mode (attenuated when near target hover)
             f_apf, _ = self.obstacle_map.compute_apf_force(self.data.qpos[0:3], vel)
             f_apf_clamped = np.clip(f_apf[0:2], -6.0, 6.0)
 

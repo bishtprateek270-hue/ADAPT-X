@@ -151,6 +151,7 @@ class SimulationWorker:
         self.wp_index = 0
         self.loop_waypoints = False
         self.hover_pos = np.array([0.0, 0.0, target_altitude])
+        self.arrived_hover_lock = True
         self.cam_fixed_azimuth = 90.0
         
         self.latest_jpeg = None
@@ -181,10 +182,10 @@ class SimulationWorker:
         # Control gains tuned for high-speed dynamic city canyon navigation
         self.kp_z = 26.0
         self.kd_z = 9.5
-        self.kp_pos = 0.90
-        self.kd_pos = 0.70
-        self.kp_att = 3.6
-        self.kd_att = 0.45
+        self.kp_pos = 3.0
+        self.kd_pos = 2.0
+        self.kp_att = 4.2
+        self.kd_att = 0.55
         self.step_count = 0
 
         self.telemetry = {
@@ -254,6 +255,7 @@ class SimulationWorker:
             self.waypoints = [np.array([float(p[0]), float(p[1]), float(p[2])]) for p in corridor_path]
             self.wp_index = 0
             self.loop_waypoints = False
+            self.arrived_hover_lock = False
 
     def set_waypoints(self, wps, loop=False, reset_idx=True):
         with self.state_lock:
@@ -274,6 +276,9 @@ class SimulationWorker:
                 self.wp_index = 0
             if not self.waypoints:
                 self.hover_pos = self.env.data.qpos[0:3].copy()
+                self.arrived_hover_lock = True
+            else:
+                self.arrived_hover_lock = False
 
     def add_waypoint(self, x, y, z=None):
         with self.state_lock:
@@ -284,16 +289,20 @@ class SimulationWorker:
             for pt in sub_path:
                 self.waypoints.append(np.array([float(pt[0]), float(pt[1]), float(pt[2])]))
             self.wp_index = min(len(self.waypoints) - 1, self.wp_index)
+            self.arrived_hover_lock = False
 
     def clear_waypoints(self):
         with self.state_lock:
             self.waypoints = []
             self.wp_index = 0
             self.hover_pos = self.env.data.qpos[0:3].copy()
+            self.arrived_hover_lock = True
 
     def toggle_loop(self):
         with self.state_lock:
             self.loop_waypoints = not self.loop_waypoints
+            if self.loop_waypoints:
+                self.arrived_hover_lock = False
 
     def set_camera(self, mode):
         with self.state_lock:
@@ -322,6 +331,10 @@ class SimulationWorker:
     def reset_simulation(self):
         with self.state_lock:
             self.env.reset_adaptive()
+            self.waypoints = []
+            self.wp_index = 0
+            self.hover_pos = np.array([0.0, 0.0, self.target_altitude])
+            self.arrived_hover_lock = True
             if self.damage_motor != "none":
                 self.env.inject_rotor_fault("dead_motor", rotor=self.damage_motor)
 
@@ -365,22 +378,33 @@ class SimulationWorker:
                 r_horiz = float(np.hypot(curr_pos[0], curr_pos[1]))
 
                 # -------------------------------------------------------------
-                # -------------------------------------------------------------
-                # UNIFIED MISSION WAYPOINT PLANNER (ACTIVE IN BOTH CONDITIONS)
+                # UNIFIED MISSION WAYPOINT PLANNER & HOVER LOCK SYSTEM
                 # -------------------------------------------------------------
                 is_damaged = (self.damage_motor != "none")
-                cruise_speed = 1.9 if is_damaged else 2.4
+                cruise_speed = 1.9 if is_damaged else 2.5
+                is_hover_locked = False
 
+                # Check if waypoint list is empty or ended
                 if self.waypoints:
                     if self.wp_index >= len(self.waypoints):
-                        self.wp_index = 0 if self.loop_waypoints else len(self.waypoints) - 1
+                        if self.loop_waypoints:
+                            self.wp_index = 0
+                            self.arrived_hover_lock = False
+                        else:
+                            self.arrived_hover_lock = True
+                            self.hover_pos = np.array([self.waypoints[-1][0], self.waypoints[-1][1], self.target_altitude])
 
+                # Active waypoint advancement along the corridor
+                if self.waypoints and not self.arrived_hover_lock:
                     target_wp = self.waypoints[self.wp_index]
                     diff_xy = target_wp[:2] - curr_pos[:2]
                     dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
 
-                    # Check waypoint arrival threshold (0.75m)
-                    if dist_xy < 0.75:
+                    # Check waypoint arrival threshold
+                    is_last_wp = (self.wp_index == len(self.waypoints) - 1)
+                    arrival_thresh = 0.50 if (is_last_wp and not self.loop_waypoints) else 0.75
+
+                    if dist_xy < arrival_thresh:
                         if self.wp_index + 1 < len(self.waypoints):
                             self.wp_index += 1
                             target_wp = self.waypoints[self.wp_index]
@@ -392,62 +416,67 @@ class SimulationWorker:
                             diff_xy = target_wp[:2] - curr_pos[:2]
                             dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
                         else:
+                            # Arrived at final destination: latch locked hover at final waypoint
+                            self.arrived_hover_lock = True
                             self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
 
-                    # Destination reached & holding hover
-                    if not self.loop_waypoints and self.wp_index == len(self.waypoints) - 1 and dist_xy < 0.35:
-                        self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
-                        vx_des = float(np.clip(1.5 * (target_wp[0] - curr_pos[0]), -0.7, 0.7))
-                        vy_des = float(np.clip(1.5 * (target_wp[1] - curr_pos[1]), -0.7, 0.7))
-                        vz_des = 0.0
-                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
-                        ax_req = self.kp_pos * (target_wp[0] - curr_pos[0]) - self.kd_pos * curr_vel[0]
-                        ay_req = self.kp_pos * (target_wp[1] - curr_pos[1]) - self.kd_pos * curr_vel[1]
-                        psi_des = curr_yaw
-                        mode_tag = f"ROTOR {self.damage_motor.upper()} CUT" if is_damaged else "NOMINAL"
-                        status_str = f"ARRIVED AT TARGET ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) [{mode_tag}] - HOVER LOCKED"
-                    else:
-                        u_dir = diff_xy / (dist_xy + 1e-5)
-                        desired_speed = min(cruise_speed, max(0.4, 0.95 * np.sqrt(dist_xy)))
-                        vx_des = u_dir[0] * desired_speed
-                        vy_des = u_dir[1] * desired_speed
-                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
-                        vz_des = 0.0
-
-                        ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
-                        ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
-                        psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
-
-                        if is_damaged:
-                            status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY MISSION WP {self.wp_index + 1}/{len(self.waypoints)} (DIST: {dist_xy:.1f}m)"
-                        else:
-                            status_str = f"FLYING TO WP {self.wp_index + 1}/{len(self.waypoints)} ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - DIST: {dist_xy:.1f}m"
-
-                        self.hover_pos = curr_pos.copy()
-                else:
-                    # Precision Stationary Hover (Standby)
-                    x_des, y_des, z_des = self.hover_pos[0], self.hover_pos[1], self.target_altitude
-                    vx_des = float(np.clip(1.5 * (x_des - curr_pos[0]), -0.7, 0.7))
-                    vy_des = float(np.clip(1.5 * (y_des - curr_pos[1]), -0.7, 0.7))
+                # State Evaluation: Locked Hover vs Corridor Navigation
+                if not self.waypoints or self.arrived_hover_lock:
+                    is_hover_locked = True
+                    x_des, y_des = self.hover_pos[0], self.hover_pos[1]
+                    z_des = float(self.hover_pos[2]) if len(self.hover_pos) > 2 else self.target_altitude
+                    vx_des = 0.0
+                    vy_des = 0.0
                     vz_des = 0.0
-                    ax_req = self.kp_pos * (x_des - curr_pos[0]) - self.kd_pos * curr_vel[0]
-                    ay_req = self.kp_pos * (y_des - curr_pos[1]) - self.kd_pos * curr_vel[1]
+
+                    # Precision PD position hold servo (active anti-drift lock)
+                    err_x = x_des - curr_pos[0]
+                    err_y = y_des - curr_pos[1]
+                    ax_req = self.kp_pos * err_x - self.kd_pos * curr_vel[0]
+                    ay_req = self.kp_pos * err_y - self.kd_pos * curr_vel[1]
                     psi_des = curr_yaw
-                    if is_damaged:
-                        status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY HOVER LOCKED ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f})"
+
+                    mode_tag = f"ROTOR {self.damage_motor.upper()} CUT" if is_damaged else "NOMINAL"
+                    if self.waypoints:
+                        status_str = f"ARRIVED AT TARGET ({x_des:+.1f}, {y_des:+.1f}) [{mode_tag}] - HOVER LOCKED"
                     else:
-                        status_str = f"STANDBY HOVER ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f}) - CLICK MAP TO FLY"
+                        status_str = f"STANDBY HOVER ({x_des:+.1f}, {y_des:+.1f}) [{mode_tag}] - CLICK MAP TO FLY"
+                else:
+                    target_wp = self.waypoints[self.wp_index]
+                    diff_xy = target_wp[:2] - curr_pos[:2]
+                    dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+
+                    u_dir = diff_xy / (dist_xy + 1e-5)
+                    desired_speed = min(cruise_speed, max(0.40, 0.95 * np.sqrt(dist_xy)))
+                    vx_des = u_dir[0] * desired_speed
+                    vy_des = u_dir[1] * desired_speed
+                    z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
+                    vz_des = 0.0
+
+                    ax_req = 1.35 * (target_wp[0] - curr_pos[0]) + 0.95 * (vx_des - curr_vel[0])
+                    ay_req = 1.35 * (target_wp[1] - curr_pos[1]) + 0.95 * (vy_des - curr_vel[1])
+                    psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
+
+                    if is_damaged:
+                        status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY MISSION WP {self.wp_index + 1}/{len(self.waypoints)} (DIST: {dist_xy:.1f}m)"
+                    else:
+                        status_str = f"FLYING TO WP {self.wp_index + 1}/{len(self.waypoints)} ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - DIST: {dist_xy:.1f}m"
 
                 # -------------------------------------------------------------
                 # REAL-TIME ARTIFICIAL POTENTIAL FIELD (APF) OBSTACLE AVOIDANCE
                 # -------------------------------------------------------------
                 f_apf, d_min_obs = self.obstacle_map.compute_apf_force(curr_pos, curr_vel)
 
-                # Active speed scaling when nearing any building or obstacle
-                if d_min_obs < 2.5:
-                    speed_scale = float(np.clip((d_min_obs - 0.4) / 2.1, 0.20, 1.0))
-                    vx_des *= speed_scale
-                    vy_des *= speed_scale
+                if is_hover_locked:
+                    # In locked hover, suppress APF forces entirely unless dangerously close to a wall facade (< 0.75m)
+                    if d_min_obs >= 0.75:
+                        f_apf = np.zeros(3)
+                else:
+                    # Active speed scaling when nearing any building or obstacle during transit
+                    if d_min_obs < 2.5:
+                        speed_scale = float(np.clip((d_min_obs - 0.4) / 2.1, 0.25, 1.0))
+                        vx_des *= speed_scale
+                        vy_des *= speed_scale
 
                 # Inject APF repulsive acceleration into control vector
                 ax_req += float(np.clip(f_apf[0] / self.env.mass, -12.0, 12.0))
@@ -499,7 +528,10 @@ class SimulationWorker:
                     fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 8.5 * curr_vel[2]) / cos_tilt, 2.0, 24.0)
 
                     # Direct active FBW guidance assist with APF obstacle repulsion
-                    apf_offset = np.clip(f_apf[:2] * 0.18, -1.5, 1.5)
+                    self.env.target_pos = np.array([x_des if is_hover_locked else target_wp[0],
+                                                    y_des if is_hover_locked else target_wp[1],
+                                                    z_des])
+                    apf_offset = np.clip(f_apf[:2] * 0.15, -1.2, 1.2) if not is_hover_locked else np.zeros(2)
                     self.env.target_velocity = np.array([vx_des + apf_offset[0], vy_des + apf_offset[1]])
 
                     raw_forces = np.zeros(4)
@@ -560,7 +592,7 @@ class SimulationWorker:
                     "y": round(float(curr_pos[1]), 2),
                     "rotors": [int(np.clip(f / max_thrust * 100, 0, 100)) for f in raw_forces],
                     "damage": self.damage_motor,
-                    "mode": "waypoint" if self.waypoints else "hover",
+                    "mode": "hover" if is_hover_locked else "waypoint",
                     "camera": self.camera_mode,
                     "controller": self.controller_mode,
                     "dist_center": round(r_horiz, 2),
@@ -570,11 +602,11 @@ class SimulationWorker:
                     "resolution": f"{self.width}x{self.height}",
                     "step": self.step_count,
                     "waypoints": [[round(float(w[0]), 1), round(float(w[1]), 1)] for w in self.waypoints],
-                    "wp_index": (self.wp_index + 1) if self.waypoints else 0,
+                    "wp_index": (self.wp_index + 1) if (self.waypoints and not is_hover_locked) else (len(self.waypoints) if is_hover_locked else 0),
                     "wp_total": len(self.waypoints),
                     "wp_dist": wp_dist_val,
                     "d_min_obs": round(float(d_min_obs), 2),
-                    "collision_shield": "ACTIVE (APF VORTEX)",
+                    "collision_shield": "STANDBY HOVER (LOCKED)" if is_hover_locked else "ACTIVE (APF VORTEX)",
                     "loop_mode": self.loop_waypoints
                 }
 

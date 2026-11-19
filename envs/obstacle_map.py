@@ -29,8 +29,6 @@ BUILDING_BOXES = [
 
 # Cylindrical street-level obstacles [x, y, radius, height]
 CYLINDER_OBSTACLES = [
-    # Central Fountain Obelisk
-    (0.0, 0.0, 1.8, 2.5),
     # Traffic Light Gantry (x=3.6 to 5.8, y=7.0)
     (4.7, 7.0, 1.4, 4.9),
     # Street Lamps (h=3.8m)
@@ -245,17 +243,25 @@ class CityObstacleMap:
                 f_rep_2d = f_mag * normal
 
                 # Vortex circulation / tangential sliding force around building corners
-                # Eliminates getting stuck against a flat wall or sharp corner
-                tangent = np.array([-normal[1], normal[0]])
-                dot_v = vx * tangent[0] + vy * tangent[1]
-                sign_tan = 1.0 if dot_v >= 0 else -1.0
-                f_tan_2d = 3.5 * sign_tan * tangent
+                # Only active when drone is moving past obstacle (v_speed >= 0.35 m/s)
+                # Suppressed when stationary or hovering to guarantee rock-solid stationary position lock
+                if v_speed >= 0.35:
+                    tangent = np.array([-normal[1], normal[0]])
+                    dot_v = (vx * tangent[0] + vy * tangent[1]) / v_speed
+                    sign_tan = 1.0 if dot_v >= 0 else -1.0
+                    f_tan_2d = min(3.0, 3.0 * v_speed) * sign_tan * tangent
+                else:
+                    f_tan_2d = np.zeros(2)
 
                 f_total[0] += f_rep_2d[0] + f_tan_2d[0]
                 f_total[1] += f_rep_2d[1] + f_tan_2d[1]
 
         # --- 2. Cylindrical Street Furniture & Trees (Lamps, Gantries, Foliage) ---
         for ox, oy, r, h in CYLINDER_OBSTACLES:
+            # Check elevation clearance first: ignore ground obstacles when flying overhead
+            if pz > (h + 0.6):
+                continue
+
             dx = px - ox
             dy = py - oy
             d_center = float(np.hypot(dx, dy))
@@ -263,7 +269,7 @@ class CityObstacleMap:
             min_dist = min(min_dist, d_surf)
 
             # Check if drone is at or below obstacle height and within buffer
-            if pz < (h + 0.8) and d_surf < 1.6:
+            if d_surf < 1.6:
                 normal = np.array([dx, dy]) / (d_center + 1e-5)
                 f_mag = float(np.clip(12.0 * (1.0 / d_surf - 1.0 / 1.6), 0.0, 24.0))
                 f_total[0] += f_mag * normal[0]
@@ -327,3 +333,4 @@ class CityObstacleMap:
                     ranges[b_idx] = min(ranges[b_idx], float(tmin))
 
         return ranges
+
