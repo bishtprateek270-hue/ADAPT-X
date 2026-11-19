@@ -352,72 +352,91 @@ class SimulationWorker:
                 r_horiz = float(np.hypot(curr_pos[0], curr_pos[1]))
 
                 # -------------------------------------------------------------
-                # CONTROLLER EXECUTION
                 # -------------------------------------------------------------
-                if self.damage_motor == "none":
-                    # ---------------------------------------------------------
-                    # NOMINAL 4-ROTOR INTERACTIVE WAYPOINT MISSION FLIGHT
-                    # ---------------------------------------------------------
-                    if self.waypoints:
-                        if self.wp_index >= len(self.waypoints):
-                            self.wp_index = 0 if self.loop_waypoints else len(self.waypoints) - 1
+                # UNIFIED MISSION WAYPOINT PLANNER (ACTIVE IN BOTH CONDITIONS)
+                # -------------------------------------------------------------
+                is_damaged = (self.damage_motor != "none")
+                cruise_speed = 1.9 if is_damaged else 2.4
 
-                        target_wp = self.waypoints[self.wp_index]
-                        diff_xy = target_wp[:2] - curr_pos[:2]
-                        dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+                if self.waypoints:
+                    if self.wp_index >= len(self.waypoints):
+                        self.wp_index = 0 if self.loop_waypoints else len(self.waypoints) - 1
 
-                        # Check waypoint arrival threshold (0.75m)
-                        if dist_xy < 0.75:
-                            if self.wp_index + 1 < len(self.waypoints):
-                                self.wp_index += 1
-                                target_wp = self.waypoints[self.wp_index]
-                                diff_xy = target_wp[:2] - curr_pos[:2]
-                                dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
-                            elif self.loop_waypoints:
-                                self.wp_index = 0
-                                target_wp = self.waypoints[self.wp_index]
-                                diff_xy = target_wp[:2] - curr_pos[:2]
-                                dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
-                            else:
-                                self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
+                    target_wp = self.waypoints[self.wp_index]
+                    diff_xy = target_wp[:2] - curr_pos[:2]
+                    dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
 
-                        # If reached destination and holding hover
-                        if not self.loop_waypoints and self.wp_index == len(self.waypoints) - 1 and dist_xy < 0.35:
-                            vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
-                            ax_req = self.kp_pos * (target_wp[0] - curr_pos[0]) - self.kd_pos * curr_vel[0]
-                            ay_req = self.kp_pos * (target_wp[1] - curr_pos[1]) - self.kd_pos * curr_vel[1]
-                            psi_des = curr_yaw
-                            status_str = f"ARRIVED AT TARGET ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - HOVER LOCKED"
+                    # Check waypoint arrival threshold (0.75m)
+                    if dist_xy < 0.75:
+                        if self.wp_index + 1 < len(self.waypoints):
+                            self.wp_index += 1
+                            target_wp = self.waypoints[self.wp_index]
+                            diff_xy = target_wp[:2] - curr_pos[:2]
+                            dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+                        elif self.loop_waypoints:
+                            self.wp_index = 0
+                            target_wp = self.waypoints[self.wp_index]
+                            diff_xy = target_wp[:2] - curr_pos[:2]
+                            dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
                         else:
-                            u_dir = diff_xy / (dist_xy + 1e-5)
-                            cruise_speed = 2.4
-                            desired_speed = min(cruise_speed, max(0.4, 0.9 * np.sqrt(dist_xy)))
-                            vx_des = u_dir[0] * desired_speed
-                            vy_des = u_dir[1] * desired_speed
-                            z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
-                            vz_des = 0.0
+                            self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
 
-                            ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
-                            ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
-                            psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
+                    # Destination reached & holding hover
+                    if not self.loop_waypoints and self.wp_index == len(self.waypoints) - 1 and dist_xy < 0.35:
+                        self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
+                        vx_des = float(np.clip(1.5 * (target_wp[0] - curr_pos[0]), -0.7, 0.7))
+                        vy_des = float(np.clip(1.5 * (target_wp[1] - curr_pos[1]), -0.7, 0.7))
+                        vz_des = 0.0
+                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
+                        ax_req = self.kp_pos * (target_wp[0] - curr_pos[0]) - self.kd_pos * curr_vel[0]
+                        ay_req = self.kp_pos * (target_wp[1] - curr_pos[1]) - self.kd_pos * curr_vel[1]
+                        psi_des = curr_yaw
+                        mode_tag = f"ROTOR {self.damage_motor.upper()} CUT" if is_damaged else "NOMINAL"
+                        status_str = f"ARRIVED AT TARGET ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) [{mode_tag}] - HOVER LOCKED"
+                    else:
+                        u_dir = diff_xy / (dist_xy + 1e-5)
+                        desired_speed = min(cruise_speed, max(0.4, 0.95 * np.sqrt(dist_xy)))
+                        vx_des = u_dir[0] * desired_speed
+                        vy_des = u_dir[1] * desired_speed
+                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
+                        vz_des = 0.0
+
+                        ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
+                        ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
+                        psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
+
+                        if is_damaged:
+                            status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY MISSION WP {self.wp_index + 1}/{len(self.waypoints)} (DIST: {dist_xy:.1f}m)"
+                        else:
                             status_str = f"FLYING TO WP {self.wp_index + 1}/{len(self.waypoints)} ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - DIST: {dist_xy:.1f}m"
 
                         self.hover_pos = curr_pos.copy()
+                else:
+                    # Precision Stationary Hover (Standby)
+                    x_des, y_des, z_des = self.hover_pos[0], self.hover_pos[1], self.target_altitude
+                    vx_des = float(np.clip(1.5 * (x_des - curr_pos[0]), -0.7, 0.7))
+                    vy_des = float(np.clip(1.5 * (y_des - curr_pos[1]), -0.7, 0.7))
+                    vz_des = 0.0
+                    ax_req = self.kp_pos * (x_des - curr_pos[0]) - self.kd_pos * curr_vel[0]
+                    ay_req = self.kp_pos * (y_des - curr_pos[1]) - self.kd_pos * curr_vel[1]
+                    psi_des = curr_yaw
+                    if is_damaged:
+                        status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY HOVER LOCKED ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f})"
                     else:
-                        # Precision Stationary Hover (Standby)
-                        x_des, y_des, z_des = self.hover_pos[0], self.hover_pos[1], self.target_altitude
-                        vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
-                        ax_req = self.kp_pos * (x_des - curr_pos[0]) - self.kd_pos * curr_vel[0]
-                        ay_req = self.kp_pos * (y_des - curr_pos[1]) - self.kd_pos * curr_vel[1]
-                        psi_des = curr_yaw
                         status_str = f"STANDBY HOVER ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f}) - CLICK MAP TO FLY"
 
-                    # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
-                    if abs(curr_pos[0]) > 20.0:
-                        ax_req -= 2.5 * np.sign(curr_pos[0]) * (abs(curr_pos[0]) - 20.0)
-                    if abs(curr_pos[1]) > 20.0:
-                        ay_req -= 2.5 * np.sign(curr_pos[1]) * (abs(curr_pos[1]) - 20.0)
+                # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
+                if abs(curr_pos[0]) > 20.0:
+                    ax_req -= 2.5 * np.sign(curr_pos[0]) * (abs(curr_pos[0]) - 20.0)
+                    vx_des = 0.0
+                if abs(curr_pos[1]) > 20.0:
+                    ay_req -= 2.5 * np.sign(curr_pos[1]) * (abs(curr_pos[1]) - 20.0)
+                    vy_des = 0.0
 
+                # -------------------------------------------------------------
+                # CONTROLLER ALLOCATION & EXECUTION
+                # -------------------------------------------------------------
+                if not is_damaged:
                     # Rotate into drone body frame based on current yaw heading
                     cos_psi = np.cos(curr_yaw)
                     sin_psi = np.sin(curr_yaw)
@@ -442,20 +461,20 @@ class SimulationWorker:
                     raw_forces = np.linalg.inv(self.B_alloc) @ w_cmd
                     action = np.clip(raw_forces, 0.0, max_thrust)
                 else:
-                    # ---------------------------------------------------------
-                    # ⚡ 100% ROCK-SOLID EMERGENCY RECOVERY (DIAGONAL PAIR LIFT + ACTIVE FBW ASSIST)
-                    # ---------------------------------------------------------
+                    # ⚡ 3-ROTOR PATH-FOLLOWING EMERGENCY FBW SYSTEM
                     diag_pairs = {"fr": (1, 2), "fl": (0, 3), "rr": (0, 3), "rl": (1, 2)}
                     pair = diag_pairs.get(self.damage_motor, (1, 2))
 
-                    ez = self.target_altitude - curr_pos[2]
+                    ez = z_des - curr_pos[2]
                     fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 8.5 * curr_vel[2]) / cos_tilt, 2.0, 24.0)
+
+                    # Direct active FBW guidance assist to steer directly along the trajectory
+                    self.env.target_velocity = np.array([vx_des, vy_des])
 
                     raw_forces = np.zeros(4)
                     raw_forces[pair[0]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
                     raw_forces[pair[1]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
                     action = raw_forces.copy()
-                    status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY RECOVERY ACTIVE (ALTITUDE & POSITION LOCKED)"
 
                 # Step physics with adaptive history tracking
                 _obs, _hist, _reward, terminated, truncated, _ = self.env.step_adaptive(action)

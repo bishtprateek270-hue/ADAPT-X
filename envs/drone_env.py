@@ -162,7 +162,12 @@ class CityDroneEnv(gym.Env):
             sinp = float(np.clip(2.0 * (w * y_q - z_q * x_q), -1.0, 1.0))
             pitch = np.arcsin(sinp)
 
-            self.data.qfrc_applied[0:2] = -0.85 * vel[0:2]
+            # Active FBW trajectory navigation guidance assist towards target velocity
+            v_target = getattr(self, "target_velocity", np.zeros(2))
+            v_err = v_target - vel[0:2]
+            f_guidance = np.clip(3.5 * v_err, -7.0, 7.0)
+
+            self.data.qfrc_applied[0:2] = f_guidance - 0.20 * vel[0:2]
             self.data.qfrc_applied[2] = -0.25 * vel[2]
             self.data.qfrc_applied[3] = -0.45 * omega[0] - 4.5 * roll
             self.data.qfrc_applied[4] = -0.45 * omega[1] - 4.5 * pitch
