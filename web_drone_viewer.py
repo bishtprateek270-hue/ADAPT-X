@@ -640,28 +640,49 @@ HTML_PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ADAPT-X: 3D Photorealistic Drone Flight Simulator</title>
+<title>ADAPT-X: Flight Operations & Telemetry Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg-primary: #070a12;
-    --bg-card: rgba(15, 23, 42, 0.78);
-    --border-color: rgba(56, 189, 248, 0.22);
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --accent-cyan: #38bdf8;
-    --accent-emerald: #10b981;
-    --accent-rose: #f43f5e;
-    --accent-amber: #f59e0b;
-    --text-primary: #f8fafc;
-    --text-muted: #94a3b8;
+    --bg-base: #0c0e12;
+    --bg-header: #12151c;
+    --bg-surface: #151821;
+    --bg-surface-elevated: #1a1e28;
+    --bg-subtle: #1e2330;
+    --bg-inset: #0e1117;
+    
+    --border-base: #252a38;
+    --border-subtle: #1c202a;
+    --border-strong: #333a4c;
+    
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #8492a6;
+    --text-dim: #556277;
+    
+    --accent-blue: #2563eb;
+    --accent-blue-hover: #1d4ed8;
+    
+    --status-nominal: #10b981;
+    --status-nominal-bg: rgba(16, 185, 129, 0.12);
+    --status-nominal-border: rgba(16, 185, 129, 0.3);
+    
+    --status-warning: #f59e0b;
+    --status-warning-bg: rgba(245, 158, 11, 0.12);
+    --status-warning-border: rgba(245, 158, 11, 0.3);
+    
+    --status-danger: #ef4444;
+    --status-danger-bg: rgba(239, 68, 68, 0.12);
+    --status-danger-border: rgba(239, 68, 68, 0.3);
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background-color: var(--bg-primary);
+    background-color: var(--bg-base);
     color: var(--text-primary);
-    font-family: 'Outfit', -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -669,11 +690,11 @@ HTML_PAGE = """<!DOCTYPE html>
     user-select: none;
     -webkit-font-smoothing: antialiased;
   }
+
   header {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.75));
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border-color);
-    padding: 12px 24px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-base);
+    padding: 10px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -683,40 +704,45 @@ HTML_PAGE = """<!DOCTYPE html>
   }
   .brand { display: flex; align-items: center; gap: 12px; }
   .badge {
-    background: linear-gradient(135deg, #0284c7, #0369a1);
-    color: #fff;
+    background: #1e2432;
+    color: #e2e8f0;
+    border: 1px solid #333d52;
     font-size: 11px;
-    font-weight: 800;
-    padding: 4px 10px;
-    border-radius: 6px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    box-shadow: 0 0 14px rgba(2, 132, 199, 0.45);
+    letter-spacing: 0.6px;
   }
-  h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.4px; }
+  h1 { font-size: 15px; font-weight: 700; color: #f8fafc; letter-spacing: -0.2px; }
   .subtitle { font-size: 12px; color: var(--text-muted); }
-  
+
   .header-badges { display: flex; align-items: center; gap: 10px; }
   .chip {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-base);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 6px;
   }
-  .chip-online { border-color: rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+  .chip-online {
+    color: var(--status-nominal);
+    border-color: var(--status-nominal-border);
+    background: var(--status-nominal-bg);
+  }
 
   main {
     flex: 1;
     display: flex;
-    padding: 14px;
-    gap: 14px;
-    height: calc(100vh - 61px);
+    padding: 12px;
+    gap: 12px;
+    height: calc(100vh - 53px);
     overflow: hidden;
   }
 
@@ -724,69 +750,66 @@ HTML_PAGE = """<!DOCTYPE html>
   .stage-container {
     flex: 1;
     background: #000;
-    border-radius: 14px;
+    border-radius: 8px;
     overflow: hidden;
     position: relative;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 20px 45px rgba(0,0,0,0.7), 0 0 30px rgba(56, 189, 248, 0.08);
+    border: 1px solid var(--border-base);
     display: flex;
     align-items: center;
     justify-content: center;
-    transform: translateZ(0);
-    will-change: transform;
   }
   #stream-canvas {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
-    image-rendering: auto;
   }
 
   /* HUD Overlays */
   .hud-top {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    right: 14px;
+    top: 12px;
+    left: 12px;
+    right: 12px;
     display: flex;
     justify-content: space-between;
     pointer-events: none;
     z-index: 10;
   }
-  .hud-group { display: flex; gap: 8px; }
+  .hud-group { display: flex; gap: 6px; }
   .hud-chip {
-    background: rgba(11, 17, 33, 0.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: var(--text-primary);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    background: rgba(14, 17, 24, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
-  .hud-fps-val { color: var(--accent-emerald); font-weight: 800; }
-  
+  .hud-fps-val {
+    color: #38bdf8;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+
   /* Status Banner */
   .hud-status-bottom {
     position: absolute;
-    bottom: 14px;
-    left: 14px;
-    background: rgba(11, 17, 33, 0.92);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(16, 185, 129, 0.5);
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 13px;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(14, 17, 24, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--status-nominal-border);
+    border-radius: 5px;
+    padding: 6px 12px;
+    font-size: 11.5px;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: var(--accent-emerald);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    font-weight: 600;
+    color: var(--status-nominal);
     pointer-events: none;
     transition: all 0.2s ease;
     z-index: 10;
@@ -795,13 +818,13 @@ HTML_PAGE = """<!DOCTYPE html>
   /* Urban City Safe Containment Radar */
   .hud-radar {
     position: absolute;
-    bottom: 14px;
-    right: 14px;
-    width: 96px;
-    height: 96px;
-    background: rgba(11, 17, 33, 0.88);
+    bottom: 12px;
+    right: 12px;
+    width: 86px;
+    height: 86px;
+    background: rgba(14, 17, 24, 0.9);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(56, 189, 248, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 50%;
     pointer-events: none;
     display: flex;
@@ -811,124 +834,132 @@ HTML_PAGE = """<!DOCTYPE html>
   }
   .radar-crosshair-x {
     position: absolute;
-    width: 76px;
+    width: 68px;
     height: 1px;
-    background: rgba(56, 189, 248, 0.25);
+    background: rgba(255, 255, 255, 0.12);
   }
   .radar-crosshair-y {
     position: absolute;
     width: 1px;
-    height: 76px;
-    background: rgba(56, 189, 248, 0.25);
+    height: 68px;
+    background: rgba(255, 255, 255, 0.12);
   }
   .radar-ring {
     position: absolute;
-    border: 1px dashed rgba(56, 189, 248, 0.35);
+    border: 1px dashed rgba(255, 255, 255, 0.14);
     border-radius: 50%;
   }
-  .radar-ring.outer { width: 76px; height: 76px; border-color: rgba(244, 63, 94, 0.45); }
-  .radar-ring.inner { width: 40px; height: 40px; }
+  .radar-ring.outer { width: 68px; height: 68px; border-color: rgba(239, 68, 68, 0.35); }
+  .radar-ring.inner { width: 36px; height: 36px; }
   .radar-drone-dot {
     position: absolute;
-    width: 9px;
-    height: 9px;
-    background: var(--accent-cyan);
+    width: 7px;
+    height: 7px;
+    background: #3b82f6;
+    border: 1.5px solid #ffffff;
     border-radius: 50%;
-    box-shadow: 0 0 10px var(--accent-cyan);
     transition: transform 0.05s linear;
   }
   .radar-label {
     position: absolute;
-    top: -18px;
-    font-size: 10px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: var(--accent-cyan);
+    top: -16px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-muted);
     text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   /* Sidebar Controls & Telemetry */
   .sidebar {
-    width: 390px;
+    width: 380px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-right: 2px;
   }
-  .sidebar::-webkit-scrollbar { width: 5px; }
-  .sidebar::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.25); border-radius: 4px; }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-base); border-radius: 2px; }
 
   .card {
-    background: var(--bg-card);
-    backdrop-filter: blur(14px);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 13px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-base);
+    border-radius: 8px;
+    padding: 12px;
   }
   .card-title {
-    font-size: 12px;
-    font-weight: 800;
+    font-size: 11.5px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.9px;
-    color: var(--accent-cyan);
-    margin-bottom: 10px;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
   .card-title-badge {
     font-size: 10px;
-    color: var(--accent-emerald);
-    background: rgba(16, 185, 129, 0.15);
+    font-weight: 600;
+    color: var(--status-nominal);
+    background: var(--status-nominal-bg);
+    border: 1px solid var(--status-nominal-border);
     padding: 2px 6px;
     border-radius: 4px;
+    letter-spacing: 0.3px;
   }
 
   .telemetry-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 7px;
+    gap: 6px;
   }
   .tel-item {
-    background: rgba(11, 17, 33, 0.65);
+    background: var(--bg-surface-elevated);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 7px 9px;
+    border-radius: 6px;
+    padding: 6px 8px;
   }
-  .tel-label { font-size: 10.5px; color: var(--text-muted); font-weight: 500; }
-  .tel-val { font-size: 14.5px; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-top: 2px; }
+  .tel-label { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+  .tel-val {
+    font-size: 13.5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: #f8fafc;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* Rotors Display */
   .rotors-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 7px;
+    gap: 6px;
     margin-top: 6px;
   }
   .rotor-box {
-    background: rgba(11, 17, 33, 0.65);
+    background: var(--bg-surface-elevated);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 7px 9px;
+    border-radius: 6px;
+    padding: 6px 8px;
     position: relative;
     overflow: hidden;
   }
   .rotor-head { display: flex; justify-content: space-between; align-items: baseline; }
-  .rotor-name { font-size: 10.5px; color: var(--text-muted); font-weight: 600; }
-  .rotor-pct { font-size: 13.5px; font-family: 'JetBrains Mono', monospace; font-weight: 800; }
+  .rotor-name { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+  .rotor-pct { font-size: 13px; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #f8fafc; }
   .rotor-bar-bg {
-    height: 5px;
-    background: rgba(255, 255, 255, 0.09);
-    border-radius: 3px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
     overflow: hidden;
     margin-top: 5px;
   }
   .rotor-bar-fill {
     height: 100%;
     width: 31%;
-    background: linear-gradient(90deg, #06b6d4, #38bdf8);
+    background: var(--accent-blue);
     transition: width 0.05s linear;
   }
 
@@ -940,81 +971,77 @@ HTML_PAGE = """<!DOCTYPE html>
   .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
   .btn {
-    background: rgba(15, 23, 42, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: var(--text-primary);
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 11.5px;
-    font-weight: 700;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-base);
+    color: var(--text-secondary);
+    padding: 7px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     text-align: center;
     position: relative;
-    overflow: hidden;
   }
   .btn:hover {
-    background: rgba(56, 189, 248, 0.18);
-    border-color: var(--accent-cyan);
-    transform: translateY(-1px);
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+    color: #ffffff;
   }
-  .btn:active { transform: translateY(0); }
+  .btn:active {
+    background: #11141c;
+  }
   .btn.active {
-    background: linear-gradient(135deg, #0284c7, #0369a1);
-    border-color: var(--accent-cyan);
-    color: #fff;
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+    background: var(--accent-blue);
+    border-color: #3b82f6;
+    color: #ffffff;
   }
   .btn-danger {
-    background: rgba(244, 63, 94, 0.12);
-    border-color: rgba(244, 63, 94, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.3);
     color: #fca5a5;
   }
   .btn-danger:hover {
-    background: rgba(244, 63, 94, 0.28);
-    border-color: var(--accent-rose);
-    color: #fff;
-    box-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #ffffff;
   }
   .btn-restore {
-    background: rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.1);
+    border-color: var(--status-nominal-border);
     color: #6ee7b7;
-    margin-top: 3px;
+    margin-top: 2px;
   }
   .btn-restore:hover {
-    background: rgba(16, 185, 129, 0.3);
-    border-color: var(--accent-emerald);
-    color: #fff;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.22);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #ffffff;
   }
   .btn-kbd {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
     font-size: 9px;
-    padding: 1px 4px;
-    background: rgba(0,0,0,0.35);
-    border-radius: 4px;
-    color: var(--text-muted);
+    opacity: 0.6;
+    margin-left: 4px;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .shortcut-bar {
-    font-size: 11px;
+    font-size: 10.5px;
     color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace;
     text-align: center;
     padding: 6px;
-    background: rgba(11, 17, 33, 0.6);
-    border-radius: 8px;
-    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    border-radius: 6px;
+    border: 1px solid var(--border-base);
   }
   .shortcut-bar kbd {
-    background: rgba(255,255,255,0.12);
+    background: #252b38;
+    border: 1px solid #374151;
     padding: 1px 4px;
     border-radius: 3px;
-    color: var(--accent-cyan);
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
   }
 </style>
 </head>
@@ -1024,15 +1051,15 @@ HTML_PAGE = """<!DOCTYPE html>
   <div class="brand">
     <div class="badge">ADAPT-X</div>
     <div>
-      <h1>Photorealistic 3D Drone Flight Simulator</h1>
-      <div class="subtitle">Autonomous Rotor Loss Recovery & Urban Anti-Collision Suite</div>
+      <h1>Flight Operations Console</h1>
+      <div class="subtitle">Autonomous Fault-Tolerant Urban Navigation</div>
     </div>
   </div>
   <div class="header-badges">
     <div class="chip chip-online">
-      <span style="font-size: 10px;">●</span> NVIDIA DGX SPARK (GB10)
+      <span style="font-size: 8px;">●</span> System Online
     </div>
-    <button class="btn" onclick="toggleFullscreen()" style="padding: 5px 10px; font-size: 11px;">⛶ Fullscreen</button>
+    <button class="btn" onclick="toggleFullscreen()" style="padding: 5px 10px; font-size: 11px;">Fullscreen</button>
   </div>
 </header>
 
@@ -1043,11 +1070,11 @@ HTML_PAGE = """<!DOCTYPE html>
     
     <div class="hud-top">
       <div class="hud-group">
-        <div class="hud-chip">📹 <span id="hud-cam">CHASE CAM</span></div>
-        <div class="hud-chip" id="hud-stream-mode">⚡ WEBSOCKET 50 FPS (ZERO LAG)</div>
+        <div class="hud-chip"><span id="hud-cam">CHASE CAM</span></div>
+        <div class="hud-chip" id="hud-stream-mode">WEBSOCKET 50 FPS</div>
       </div>
       <div class="hud-group">
-        <div class="hud-chip">🖥️ <span id="hud-res">1280×720 (720p HD)</span></div>
+        <div class="hud-chip"><span id="hud-res">1280×720</span></div>
         <div class="hud-chip">
           CLIENT: <span class="hud-fps-val" id="hud-client-fps">50 FPS</span>
         </div>
@@ -1067,7 +1094,7 @@ HTML_PAGE = """<!DOCTYPE html>
       <div class="radar-drone-dot" id="radar-dot"></div>
     </div>
 
-    <div class="hud-status-bottom" id="hud-status-bottom">● ALL MOTORS NOMINAL - 4-ROTOR CRUISE</div>
+    <div class="hud-status-bottom" id="hud-status-bottom">ALL MOTORS NOMINAL - 4-ROTOR CRUISE</div>
   </div>
 
   <!-- Sidebar Controls -->
@@ -1075,7 +1102,7 @@ HTML_PAGE = """<!DOCTYPE html>
     <div class="card">
       <div class="card-title">
         <span>Flight Telemetry</span>
-        <span class="card-title-badge" id="badge-lock">100% LOCK</span>
+        <span class="card-title-badge" id="badge-lock">GPS LOCK</span>
       </div>
       <div class="telemetry-grid">
         <div class="tel-item"><div class="tel-label">Altitude (Z)</div><div class="tel-val" id="tel-alt">4.50 m</div></div>
@@ -1083,10 +1110,10 @@ HTML_PAGE = """<!DOCTYPE html>
         <div class="tel-item"><div class="tel-label">Roll / Pitch</div><div class="tel-val" id="tel-angles">0.0° / 0.0°</div></div>
         <div class="tel-item"><div class="tel-label">Yaw Angle</div><div class="tel-val" id="tel-yaw">0.0°</div></div>
         <div class="tel-item"><div class="tel-label">Dist to Center</div><div class="tel-val" id="tel-dist">0.00 m</div></div>
-        <div class="tel-item"><div class="tel-label">Containment</div><div class="tel-val" id="tel-cont" style="color: var(--accent-emerald); font-size: 13px;">SAFE</div></div>
+        <div class="tel-item"><div class="tel-label">Containment</div><div class="tel-val" id="tel-cont" style="color: var(--status-nominal); font-size: 13px;">SAFE</div></div>
       </div>
 
-      <div class="card-title" style="margin-top: 12px;">
+      <div class="card-title" style="margin-top: 10px;">
         <span>Brushless Motor Thrust</span>
       </div>
       <div class="rotors-grid">
@@ -1124,35 +1151,26 @@ HTML_PAGE = """<!DOCTYPE html>
     <!-- Failure Injection -->
     <div class="card">
       <div class="card-title">
-        <span>Failure Injection (Test Recovery)</span>
-        <span style="font-size: 10px; color: var(--accent-rose);">FAIL-SAFE TEST</span>
+        <span>Fault Injection</span>
+        <span style="font-size: 10px; color: var(--status-danger); font-weight: 600;">FAIL-SAFE TEST</span>
       </div>
       <div class="btn-group">
         <div class="mode-row cols-2">
-          <button class="btn btn-danger" onclick="injectDamage('fr')">💥 Cut M1 (FR) <span class="btn-kbd">1</span></button>
-          <button class="btn btn-danger" onclick="injectDamage('fl')">💥 Cut M2 (FL) <span class="btn-kbd">2</span></button>
-          <button class="btn btn-danger" onclick="injectDamage('rr')">💥 Cut M3 (RR) <span class="btn-kbd">3</span></button>
-          <button class="btn btn-danger" onclick="injectDamage('rl')">💥 Cut M4 (RL) <span class="btn-kbd">4</span></button>
+          <button class="btn btn-danger" onclick="injectDamage('fr')">Cut M1 (FR) <span class="btn-kbd">[1]</span></button>
+          <button class="btn btn-danger" onclick="injectDamage('fl')">Cut M2 (FL) <span class="btn-kbd">[2]</span></button>
+          <button class="btn btn-danger" onclick="injectDamage('rr')">Cut M3 (RR) <span class="btn-kbd">[3]</span></button>
+          <button class="btn btn-danger" onclick="injectDamage('rl')">Cut M4 (RL) <span class="btn-kbd">[4]</span></button>
         </div>
-        <button class="btn btn-restore" onclick="injectDamage('none')">🔄 Restore All 4 Motors <span class="btn-kbd">R</span></button>
+        <button class="btn btn-restore" onclick="injectDamage('none')">Restore All Motors <span class="btn-kbd">[R]</span></button>
       </div>
     </div>
 
-    <!-- Controller Engine -->
-    <div class="card">
-      <div class="card-title">Controller Core</div>
-      <div class="mode-row cols-2">
-        <button class="btn active" id="ctrl-adaptive" onclick="setController('adaptive')">🛡️ Dynamic Inversion</button>
-        <button class="btn" id="ctrl-neural" onclick="setController('neural')">⚡ Neural RL (DGX)</button>
-      </div>
-    </div>
-
-    <!-- Camera Angle -->
+    <!-- Camera View -->
     <div class="card">
       <div class="card-title">Camera Angle</div>
       <div class="mode-row cols-4">
         <button class="btn active" id="cam-chase" onclick="setCam('chase')">Chase</button>
-        <button class="btn" id="cam-fpv" onclick="setCam('fpv')">FPV</button>
+        <button class="btn" id="cam-fpv" onclick="setCam('fpv')">Cockpit</button>
         <button class="btn" id="cam-orbit" onclick="setCam('orbit')">360°</button>
         <button class="btn" id="cam-top" onclick="setCam('top')">Top</button>
       </div>
@@ -1161,36 +1179,36 @@ HTML_PAGE = """<!DOCTYPE html>
     <!-- Interactive City Flight Map & Waypoint Mission Planner -->
     <div class="card" id="card-mission-map">
       <div class="card-title">
-        <span>Tactical City Flight Map</span>
+        <span>Flight Plan Map</span>
         <span class="card-title-badge" id="badge-wp-status">STANDBY HOVER</span>
       </div>
       
       <!-- Flight Navigation Mode Selection -->
       <div class="mode-row cols-2" style="margin-bottom: 6px;">
-        <button class="btn active" id="mode-btn-flyto" onclick="setMapClickMode('fly_to')">🎯 Fly Directly Here</button>
-        <button class="btn" id="mode-btn-route" onclick="setMapClickMode('draw_route')">📍 Plot Patrol Route</button>
+        <button class="btn active" id="mode-btn-flyto" onclick="setMapClickMode('fly_to')">Direct Fly-To</button>
+        <button class="btn" id="mode-btn-route" onclick="setMapClickMode('draw_route')">Plot Route</button>
       </div>
 
-      <div id="map-helper-text" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 6px;">
-        🎯 Click anywhere on the map to dispatch the drone directly to that location.
+      <div id="map-helper-text" style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+        Click anywhere on map to dispatch drone directly.
       </div>
 
       <!-- 2D Interactive Tactical Map Canvas -->
-      <div style="position: relative; width: 100%; height: 230px; background: #070d18; border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; overflow: hidden; cursor: crosshair;">
+      <div style="position: relative; width: 100%; height: 230px; background: #0e1117; border: 1px solid var(--border-base); border-radius: 6px; overflow: hidden; cursor: crosshair;">
         <canvas id="mission-canvas" width="350" height="230" style="width: 100%; height: 100%; display: block;"></canvas>
       </div>
 
       <!-- Map Mission Controls -->
       <div class="mode-row cols-2" style="margin-top: 8px; margin-bottom: 6px;">
-        <button class="btn" id="btn-clear-wp" onclick="clearAllWaypoints()">🧹 Clear Path / Hover</button>
-        <button class="btn" id="btn-loop-wp" onclick="toggleWaypointLoop()">🔁 Loop: OFF</button>
+        <button class="btn" id="btn-clear-wp" onclick="clearAllWaypoints()">Clear Route & Hover</button>
+        <button class="btn" id="btn-loop-wp" onclick="toggleWaypointLoop()">Loop: Off</button>
       </div>
 
       <!-- Mission Presets -->
       <div style="display: flex; gap: 4px; margin-top: 4px;">
-        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('plaza')">🏛️ Plaza Loop</button>
-        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('avenue')">🛣️ Avenue Run</button>
-        <button class="btn" style="flex: 1; font-size: 10px; padding: 6px 2px;" onclick="loadPreset('skyline')">🏙️ Skyline Tour</button>
+        <button class="btn" style="flex: 1; font-size: 10.5px; padding: 6px 2px;" onclick="loadPreset('plaza')">Plaza Loop</button>
+        <button class="btn" style="flex: 1; font-size: 10.5px; padding: 6px 2px;" onclick="loadPreset('avenue')">Avenue Run</button>
+        <button class="btn" style="flex: 1; font-size: 10.5px; padding: 6px 2px;" onclick="loadPreset('skyline')">Skyline Tour</button>
       </div>
     </div>
 
@@ -1219,13 +1237,15 @@ function updateHUD(data) {
 
   // Bottom Status
   const botChip = document.getElementById('hud-status-bottom');
-  botChip.innerText = data.status_text;
-  if (data.damage === 'none') {
-    botChip.style.color = 'var(--accent-emerald)';
-    botChip.style.borderColor = 'rgba(16, 185, 129, 0.5)';
-  } else {
-    botChip.style.color = 'var(--accent-amber)';
-    botChip.style.borderColor = 'rgba(245, 158, 11, 0.7)';
+  if (botChip) {
+    botChip.innerText = data.status_text;
+    if (data.damage === 'none') {
+      botChip.style.color = 'var(--status-nominal)';
+      botChip.style.borderColor = 'var(--status-nominal-border)';
+    } else {
+      botChip.style.color = 'var(--status-warning)';
+      botChip.style.borderColor = 'var(--status-warning-border)';
+    }
   }
 
   // Rotors
@@ -1239,11 +1259,11 @@ function updateHUD(data) {
     if (barEl) {
       barEl.style.width = pct + '%';
       if (pct === 0) {
-        barEl.style.background = 'var(--accent-rose)';
+        barEl.style.background = 'var(--status-danger)';
       } else if (pct > 75) {
-        barEl.style.background = 'linear-gradient(90deg, #10b981, #f59e0b)';
+        barEl.style.background = 'var(--status-warning)';
       } else {
-        barEl.style.background = 'linear-gradient(90deg, #06b6d4, #38bdf8)';
+        barEl.style.background = 'var(--accent-blue)';
       }
     }
   }
@@ -1347,8 +1367,8 @@ function triggerHttpFallback() {
       if (!wsConnected) {
         const chip = document.getElementById('hud-stream-mode');
         if (chip) {
-          chip.innerText = '📡 HTTP STREAM (FALLBACK)';
-          chip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          chip.innerText = 'HTTP STREAM (FALLBACK)';
+          chip.style.borderColor = 'var(--status-warning-border)';
         }
       }
     })
@@ -1371,8 +1391,8 @@ function connectWebSocket() {
       if (httpFallbackTimer) clearTimeout(httpFallbackTimer);
       const chip = document.getElementById('hud-stream-mode');
       if (chip) {
-        chip.innerText = '⚡ WEBSOCKET 50 FPS (ZERO LAG)';
-        chip.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        chip.innerText = 'WEBSOCKET 50 FPS';
+        chip.style.borderColor = 'var(--status-nominal-border)';
       }
     };
 
@@ -1400,8 +1420,8 @@ function connectWebSocket() {
       wsConnected = false;
       const chip = document.getElementById('hud-stream-mode');
       if (chip) {
-        chip.innerText = '🔄 WS RECONNECTING (HTTP ACTIVE)';
-        chip.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+        chip.innerText = 'RECONNECTING WS (HTTP ACTIVE)';
+        chip.style.borderColor = 'var(--status-warning-border)';
       }
       triggerHttpFallback();
       setTimeout(connectWebSocket, 1500);
@@ -1493,8 +1513,8 @@ function setMapClickMode(mode) {
   const helper = document.getElementById('map-helper-text');
   if (helper) {
     helper.innerText = mode === 'fly_to' 
-      ? '🎯 Click anywhere on the map to dispatch the drone directly to that location.' 
-      : '📍 Click multiple points to plot a custom waypoint sequence route.';
+      ? 'Click anywhere on map to dispatch drone directly.' 
+      : 'Click multiple points to plot custom patrol route.';
   }
 }
 
@@ -1503,13 +1523,13 @@ function updateBadge() {
   if (badge) {
     if (waypoints.length === 0) {
       badge.innerText = 'STANDBY HOVER';
-      badge.style.color = 'var(--accent-amber)';
+      badge.style.color = 'var(--status-warning)';
     } else if (waypoints.length === 1 && !loopMode) {
       badge.innerText = `TARGET (${waypoints[0].x}, ${waypoints[0].y})`;
-      badge.style.color = 'var(--accent-cyan)';
+      badge.style.color = 'var(--accent-blue)';
     } else {
       badge.innerText = `${waypoints.length} WP ${loopMode ? 'PATROL' : 'ROUTE'}`;
-      badge.style.color = 'var(--accent-emerald)';
+      badge.style.color = 'var(--status-nominal)';
     }
   }
 }
@@ -1526,7 +1546,7 @@ function clearAllWaypoints() {
   const btn = document.getElementById('btn-loop-wp');
   if (btn) {
     btn.classList.remove('active');
-    btn.innerText = '🔁 Loop: OFF';
+    btn.innerText = 'Loop: Off';
   }
   sendCommand({ action: 'clear_waypoints' });
   updateBadge();
@@ -1538,7 +1558,7 @@ function toggleWaypointLoop() {
   const btn = document.getElementById('btn-loop-wp');
   if (btn) {
     btn.classList.toggle('active', loopMode);
-    btn.innerText = loopMode ? '🔁 Loop: ON' : '⏹️ Loop: OFF';
+    btn.innerText = loopMode ? 'Loop: On' : 'Loop: Off';
   }
   if (waypoints.length > 0) {
     syncWaypoints(false);
@@ -1577,7 +1597,7 @@ function loadPreset(type) {
   const btn = document.getElementById('btn-loop-wp');
   if (btn) {
     btn.classList.add('active');
-    btn.innerText = '🔁 Loop: ON';
+    btn.innerText = 'Loop: On';
   }
   syncWaypoints(true);
 }
@@ -1607,7 +1627,7 @@ if (missionCanvas) {
       const loopBtn = document.getElementById('btn-loop-wp');
       if (loopBtn) {
         loopBtn.classList.remove('active');
-        loopBtn.innerText = '🔁 Loop: OFF';
+        loopBtn.innerText = 'Loop: Off';
       }
       sendCommand({ action: 'fly_to', x: clampedX, y: clampedY });
       updateBadge();
@@ -1638,32 +1658,32 @@ function drawMissionMap(data) {
   const cy = h / 2;
   const scale = 5.8;
 
-  // Background Dark Urban Tactical Canvas
-  mCtx.fillStyle = '#060a12';
+  // Background Dark Slate Navigation Chart
+  mCtx.fillStyle = '#0e1117';
   mCtx.fillRect(0, 0, w, h);
 
   // Concentric Distance Rings & Labels
   [5, 10, 15].forEach(r => {
     mCtx.beginPath();
     mCtx.arc(cx, cy, r * scale, 0, Math.PI * 2);
-    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.12)';
+    mCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     mCtx.lineWidth = 1;
     mCtx.setLineDash([3, 4]);
     mCtx.stroke();
     mCtx.setLineDash([]);
-    mCtx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-    mCtx.font = '8px JetBrains Mono, monospace';
+    mCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    mCtx.font = '8px Inter, system-ui, sans-serif';
     mCtx.fillText(r + 'm', cx + r * scale + 2, cy - 3);
   });
 
   // Roads: North-South Avenue & East-West Boulevard
   const roadHalfW = 3.2 * scale;
-  mCtx.fillStyle = 'rgba(22, 28, 38, 0.95)';
+  mCtx.fillStyle = '#161922';
   mCtx.fillRect(cx - roadHalfW, 0, roadHalfW * 2, h);
   mCtx.fillRect(0, cy - roadHalfW, w, roadHalfW * 2);
 
-  // Yellow Road Centerlines
-  mCtx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+  // Road Centerlines
+  mCtx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
   mCtx.lineWidth = 1.2;
   mCtx.setLineDash([4, 4]);
   mCtx.beginPath();
@@ -1672,33 +1692,33 @@ function drawMissionMap(data) {
   mCtx.stroke();
   mCtx.setLineDash([]);
 
-  // Grand Plaza (with Star Compass Rose representation)
+  // Grand Plaza
   const plazaSize = 4.2 * scale;
-  mCtx.fillStyle = 'rgba(38, 48, 65, 0.75)';
+  mCtx.fillStyle = '#1c2230';
   mCtx.fillRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
-  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+  mCtx.strokeStyle = '#2d374d';
   mCtx.lineWidth = 1;
   mCtx.strokeRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
 
   // Central Fountain Circle
   mCtx.beginPath();
   mCtx.arc(cx, cy, 1.2 * scale, 0, Math.PI * 2);
-  mCtx.fillStyle = 'rgba(14, 116, 144, 0.6)';
+  mCtx.fillStyle = '#1b324d';
   mCtx.fill();
-  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+  mCtx.strokeStyle = '#2563eb';
   mCtx.stroke();
 
-  mCtx.fillStyle = 'rgba(224, 242, 254, 0.8)';
-  mCtx.font = 'bold 8px JetBrains Mono, monospace';
+  mCtx.fillStyle = '#94a3b8';
+  mCtx.font = '600 8px Inter, system-ui, sans-serif';
   mCtx.textAlign = 'center';
   mCtx.fillText('PLAZA', cx, cy - 1.8 * scale);
 
   // 4 Iconic Real City Landmarks (Skyscraper Collision Exclusion Zones)
   const towerPositions = [
-    { name: 'HORIZON TOWER', sub: '🚫 NO-FLY ZONE', x: 16, y: 16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
-    { name: 'METRO LOFTS', sub: '🚫 NO-FLY ZONE', x: -16, y: 16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
-    { name: 'APEX CORP', sub: '🚫 NO-FLY ZONE', x: -16, y: -16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
-    { name: 'VANGUARD', sub: '🚫 NO-FLY ZONE', x: 16, y: -16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' }
+    { name: 'HORIZON TOWER', sub: 'RESTRICTED', x: 16, y: 16, color: '#991b1b', bg: 'rgba(153, 27, 27, 0.25)' },
+    { name: 'METRO LOFTS', sub: 'RESTRICTED', x: -16, y: 16, color: '#991b1b', bg: 'rgba(153, 27, 27, 0.25)' },
+    { name: 'APEX CORP', sub: 'RESTRICTED', x: -16, y: -16, color: '#991b1b', bg: 'rgba(153, 27, 27, 0.25)' },
+    { name: 'VANGUARD', sub: 'RESTRICTED', x: 16, y: -16, color: '#991b1b', bg: 'rgba(153, 27, 27, 0.25)' }
   ];
   const towerSize = 4.2 * scale;
   towerPositions.forEach(t => {
@@ -1707,15 +1727,13 @@ function drawMissionMap(data) {
     mCtx.fillStyle = t.bg;
     mCtx.fillRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
     mCtx.strokeStyle = t.color;
-    mCtx.lineWidth = 1.4;
-    mCtx.setLineDash([3, 2]);
+    mCtx.lineWidth = 1;
     mCtx.strokeRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
-    mCtx.setLineDash([]);
     mCtx.fillStyle = '#fca5a5';
-    mCtx.font = 'bold 7px JetBrains Mono, monospace';
+    mCtx.font = '600 7px Inter, system-ui, sans-serif';
     mCtx.fillText(t.name, tx, ty - 2);
-    mCtx.fillStyle = '#f87171';
-    mCtx.font = 'bold 6px JetBrains Mono, monospace';
+    mCtx.fillStyle = '#ef4444';
+    mCtx.font = '500 6px Inter, system-ui, sans-serif';
     mCtx.fillText(t.sub, tx, ty + 7);
   });
 
@@ -1729,20 +1747,20 @@ function drawMissionMap(data) {
   infillBlocks.forEach(b => {
     const bx = cx + b.x * scale;
     const by = cy - b.y * scale;
-    mCtx.fillStyle = 'rgba(20, 25, 35, 0.85)';
+    mCtx.fillStyle = '#161922';
     mCtx.fillRect(bx - (b.w/2)*scale, by - (b.h/2)*scale, b.w*scale, b.h*scale);
-    mCtx.strokeStyle = 'rgba(71, 85, 105, 0.7)';
+    mCtx.strokeStyle = '#252a38';
     mCtx.lineWidth = 1;
     mCtx.strokeRect(bx - (b.w/2)*scale, by - (b.h/2)*scale, b.w*scale, b.h*scale);
-    mCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-    mCtx.font = '6px JetBrains Mono, monospace';
+    mCtx.fillStyle = '#64748b';
+    mCtx.font = '6px Inter, system-ui, sans-serif';
     mCtx.fillText(b.label, bx, by + 2);
   });
 
   // Avenue Axis Labels
-  mCtx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-  mCtx.font = '8px JetBrains Mono, monospace';
-  mCtx.fillText('NORTH AVENUE (Y+)', cx, 12);
+  mCtx.fillStyle = '#64748b';
+  mCtx.font = '7px Inter, system-ui, sans-serif';
+  mCtx.fillText('NORTH AVENUE (Y+)', cx, 11);
   mCtx.fillText('SOUTH AVENUE (Y-)', cx, h - 5);
   mCtx.textAlign = 'left';
   mCtx.fillText('WEST BLVD (X-)', 6, cy - 5);
@@ -1752,9 +1770,9 @@ function drawMissionMap(data) {
 
   // Draw Waypoint Flight Path
   if (waypoints.length > 0) {
-    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+    mCtx.strokeStyle = '#2563eb';
     mCtx.lineWidth = 2;
-    mCtx.setLineDash([4, 4]);
+    mCtx.setLineDash([4, 3]);
     mCtx.beginPath();
     waypoints.forEach((wp, idx) => {
       const px = cx + wp.x * scale;
@@ -1776,20 +1794,20 @@ function drawMissionMap(data) {
       const isActive = (data && data.wp_index !== undefined) ? (data.wp_index - 1 === idx) : (idx === activeWpIndex);
 
       mCtx.beginPath();
-      mCtx.arc(px, py, isActive ? 9 : 7, 0, Math.PI * 2);
-      mCtx.fillStyle = isActive ? '#f59e0b' : '#0b1121';
+      mCtx.arc(px, py, isActive ? 8 : 6, 0, Math.PI * 2);
+      mCtx.fillStyle = isActive ? '#f59e0b' : '#1e293b';
       mCtx.fill();
-      mCtx.strokeStyle = isActive ? '#fbbf24' : '#38bdf8';
-      mCtx.lineWidth = 2;
+      mCtx.strokeStyle = isActive ? '#fbbf24' : '#3b82f6';
+      mCtx.lineWidth = 1.5;
       mCtx.stroke();
 
-      mCtx.fillStyle = isActive ? '#000000' : '#38bdf8';
-      mCtx.font = 'bold 9px JetBrains Mono, monospace';
+      mCtx.fillStyle = isActive ? '#000000' : '#ffffff';
+      mCtx.font = '700 8px Inter, system-ui, sans-serif';
       mCtx.fillText(String(idx + 1), px, py + 3);
 
-      mCtx.fillStyle = 'rgba(148, 163, 184, 0.85)';
-      mCtx.font = '7px JetBrains Mono, monospace';
-      mCtx.fillText(`(${wp.x}, ${wp.y})`, px, py + 16);
+      mCtx.fillStyle = '#94a3b8';
+      mCtx.font = '6px JetBrains Mono, monospace';
+      mCtx.fillText(`(${wp.x}, ${wp.y})`, px, py + 15);
     });
   }
 
@@ -1800,30 +1818,30 @@ function drawMissionMap(data) {
     const dy = cy - data.y * scale;
     const yawRad = (data.yaw || 0) * Math.PI / 180;
 
-    // Glowing halo
+    // Subtle position halo
     mCtx.beginPath();
-    mCtx.arc(dx, dy, 11, 0, Math.PI * 2);
-    mCtx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    mCtx.arc(dx, dy, 9, 0, Math.PI * 2);
+    mCtx.fillStyle = 'rgba(37, 99, 235, 0.18)';
     mCtx.fill();
 
     // Drone body circle
     mCtx.beginPath();
-    mCtx.arc(dx, dy, 5, 0, Math.PI * 2);
-    mCtx.fillStyle = data.damage === 'none' ? '#06b6d4' : '#f43f5e';
+    mCtx.arc(dx, dy, 4.5, 0, Math.PI * 2);
+    mCtx.fillStyle = data.damage === 'none' ? '#2563eb' : '#ef4444';
     mCtx.fill();
     mCtx.strokeStyle = '#ffffff';
     mCtx.lineWidth = 1.5;
     mCtx.stroke();
 
     // Heading Arrow Vector
-    const arrowLen = 14;
+    const arrowLen = 13;
     const tipX = dx + arrowLen * Math.cos(yawRad);
     const tipY = dy - arrowLen * Math.sin(yawRad);
     mCtx.beginPath();
     mCtx.moveTo(dx, dy);
     mCtx.lineTo(tipX, tipY);
     mCtx.strokeStyle = '#38bdf8';
-    mCtx.lineWidth = 2;
+    mCtx.lineWidth = 1.8;
     mCtx.stroke();
 
     // Target tracking vector from drone to current target waypoint
@@ -1834,7 +1852,7 @@ function drawMissionMap(data) {
       mCtx.beginPath();
       mCtx.moveTo(dx, dy);
       mCtx.lineTo(tx, ty);
-      mCtx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+      mCtx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
       mCtx.lineWidth = 1;
       mCtx.setLineDash([2, 3]);
       mCtx.stroke();
