@@ -521,9 +521,14 @@ class SimulationWorker:
                     raw_forces = np.linalg.inv(self.B_alloc) @ w_cmd
                     action = np.clip(raw_forces, 0.0, max_thrust)
                 else:
-                    # ⚡ 3-ROTOR PATH-FOLLOWING EMERGENCY FBW SYSTEM
-                    diag_pairs = {"fr": (1, 2), "fl": (0, 3), "rr": (0, 3), "rl": (1, 2)}
-                    pair = diag_pairs.get(self.damage_motor, (1, 2))
+                    # True 3-Rotor Fail-Safe Allocation: All 3 surviving motors remain active and spinning
+                    motor_map = {
+                        "fr": {"dead": 0, "perp": (1, 2), "diag": 3},
+                        "fl": {"dead": 1, "perp": (0, 3), "diag": 2},
+                        "rr": {"dead": 2, "perp": (0, 3), "diag": 1},
+                        "rl": {"dead": 3, "perp": (1, 2), "diag": 0},
+                    }
+                    cfg = motor_map.get(self.damage_motor, motor_map["fr"])
 
                     ez = z_des - curr_pos[2]
                     fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 8.5 * curr_vel[2]) / cos_tilt, 2.0, 24.0)
@@ -535,9 +540,13 @@ class SimulationWorker:
                     apf_offset = np.clip(f_apf[:2] * 0.15, -1.2, 1.2) if not is_hover_locked else np.zeros(2)
                     self.env.target_velocity = np.array([vx_des + apf_offset[0], vy_des + apf_offset[1]])
 
+                    # Distribute lift across all 3 surviving motors:
+                    # Perpendicular pair handles dynamic precession balance (~38% each),
+                    # diagonal partner provides active vertical lift (~24%)
                     raw_forces = np.zeros(4)
-                    raw_forces[pair[0]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
-                    raw_forces[pair[1]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
+                    raw_forces[cfg["perp"][0]] = np.clip(fz_req * 0.38, 0.0, max_thrust)
+                    raw_forces[cfg["perp"][1]] = np.clip(fz_req * 0.38, 0.0, max_thrust)
+                    raw_forces[cfg["diag"]] = np.clip(fz_req * 0.24, 0.0, max_thrust)
                     action = raw_forces.copy()
 
                 # Step physics with adaptive history tracking
