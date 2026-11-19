@@ -84,8 +84,10 @@ class WebSocketBroadcaster:
                                 self.worker.set_controller(data.get("ctrl", "adaptive"))
                             elif action == "reset":
                                 self.worker.reset_simulation()
+                            elif action == "fly_to":
+                                self.worker.fly_to(data.get("x", 0.0), data.get("y", 0.0), data.get("z", None))
                             elif action == "set_waypoints":
-                                self.worker.set_waypoints(data.get("waypoints", []), loop=data.get("loop", True))
+                                self.worker.set_waypoints(data.get("waypoints", []), loop=data.get("loop", False), reset_idx=data.get("reset_idx", True))
                             elif action == "clear_waypoints":
                                 self.worker.clear_waypoints()
                             elif action == "add_waypoint":
@@ -142,15 +144,10 @@ class SimulationWorker:
         self.camera_mode = "chase"
         self._update_camera()
 
-        # Interactive Mission Waypoint Flight
-        self.waypoints = [
-            np.array([8.0, 0.0, target_altitude]),
-            np.array([8.0, 8.0, target_altitude + 0.5]),
-            np.array([-8.0, 8.0, target_altitude]),
-            np.array([-8.0, -8.0, target_altitude])
-        ]
+        # Interactive Mission Waypoint Flight (Standby Hover at Grand Plaza Center)
+        self.waypoints = []
         self.wp_index = 0
-        self.loop_waypoints = True
+        self.loop_waypoints = False
         self.hover_pos = np.array([0.0, 0.0, target_altitude])
         self.cam_fixed_azimuth = 90.0
         
@@ -245,7 +242,15 @@ class SimulationWorker:
             self.camera.elevation = -89.0
             self.camera.azimuth = 0.0
 
-    def set_waypoints(self, wps, loop=True):
+    def fly_to(self, x, y, z=None):
+        with self.state_lock:
+            if z is None:
+                z = self.target_altitude
+            self.waypoints = [np.array([float(x), float(y), float(z)])]
+            self.wp_index = 0
+            self.loop_waypoints = False
+
+    def set_waypoints(self, wps, loop=False, reset_idx=True):
         with self.state_lock:
             new_wps = []
             for wp in wps:
@@ -254,8 +259,9 @@ class SimulationWorker:
                 z = float(wp.get("z", self.target_altitude))
                 new_wps.append(np.array([x, y, z]))
             self.waypoints = new_wps
-            self.wp_index = 0
             self.loop_waypoints = bool(loop)
+            if reset_idx or self.wp_index >= len(self.waypoints):
+                self.wp_index = 0
             if not self.waypoints:
                 self.hover_pos = self.env.data.qpos[0:3].copy()
 
@@ -264,6 +270,7 @@ class SimulationWorker:
             if z is None:
                 z = self.target_altitude
             self.waypoints.append(np.array([float(x), float(y), float(z)]))
+            self.wp_index = min(len(self.waypoints) - 1, self.wp_index)
 
     def clear_waypoints(self):
         with self.state_lock:
@@ -359,32 +366,43 @@ class SimulationWorker:
                         diff_xy = target_wp[:2] - curr_pos[:2]
                         dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
 
-                        # Check waypoint arrival threshold (0.85m)
-                        if dist_xy < 0.85:
+                        # Check waypoint arrival threshold (0.75m)
+                        if dist_xy < 0.75:
                             if self.wp_index + 1 < len(self.waypoints):
                                 self.wp_index += 1
+                                target_wp = self.waypoints[self.wp_index]
+                                diff_xy = target_wp[:2] - curr_pos[:2]
+                                dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
                             elif self.loop_waypoints:
                                 self.wp_index = 0
-                            target_wp = self.waypoints[self.wp_index]
-                            diff_xy = target_wp[:2] - curr_pos[:2]
-                            dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+                                target_wp = self.waypoints[self.wp_index]
+                                diff_xy = target_wp[:2] - curr_pos[:2]
+                                dist_xy = float(np.hypot(diff_xy[0], diff_xy[1]))
+                            else:
+                                self.hover_pos = np.array([target_wp[0], target_wp[1], self.target_altitude])
 
-                        u_dir = diff_xy / (dist_xy + 1e-5)
-                        cruise_speed = 2.4
-                        # Smooth arrival deceleration near target
-                        desired_speed = min(cruise_speed, max(0.4, 0.9 * np.sqrt(dist_xy)))
-                        vx_des = u_dir[0] * desired_speed
-                        vy_des = u_dir[1] * desired_speed
-                        z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
-                        vz_des = 0.0
+                        # If reached destination and holding hover
+                        if not self.loop_waypoints and self.wp_index == len(self.waypoints) - 1 and dist_xy < 0.35:
+                            vx_des, vy_des, vz_des = 0.0, 0.0, 0.0
+                            ax_req = self.kp_pos * (target_wp[0] - curr_pos[0]) - self.kd_pos * curr_vel[0]
+                            ay_req = self.kp_pos * (target_wp[1] - curr_pos[1]) - self.kd_pos * curr_vel[1]
+                            psi_des = curr_yaw
+                            status_str = f"ARRIVED AT TARGET ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - HOVER LOCKED"
+                        else:
+                            u_dir = diff_xy / (dist_xy + 1e-5)
+                            cruise_speed = 2.4
+                            desired_speed = min(cruise_speed, max(0.4, 0.9 * np.sqrt(dist_xy)))
+                            vx_des = u_dir[0] * desired_speed
+                            vy_des = u_dir[1] * desired_speed
+                            z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
+                            vz_des = 0.0
 
-                        ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
-                        ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
+                            ax_req = 1.15 * (target_wp[0] - curr_pos[0]) + 0.85 * (vx_des - curr_vel[0])
+                            ay_req = 1.15 * (target_wp[1] - curr_pos[1]) + 0.85 * (vy_des - curr_vel[1])
+                            psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
+                            status_str = f"FLYING TO WP {self.wp_index + 1}/{len(self.waypoints)} ({target_wp[0]:+.1f}, {target_wp[1]:+.1f}) - DIST: {dist_xy:.1f}m"
 
-                        # Dynamic Heading Alignment: drone nose points towards target waypoint
-                        psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
                         self.hover_pos = curr_pos.copy()
-                        status_str = f"MISSION ACTIVE - WP {self.wp_index + 1}/{len(self.waypoints)} (DIST: {dist_xy:.1f}m)"
                     else:
                         # Precision Stationary Hover (Standby)
                         x_des, y_des, z_des = self.hover_pos[0], self.hover_pos[1], self.target_altitude
@@ -392,7 +410,7 @@ class SimulationWorker:
                         ax_req = self.kp_pos * (x_des - curr_pos[0]) - self.kd_pos * curr_vel[0]
                         ay_req = self.kp_pos * (y_des - curr_pos[1]) - self.kd_pos * curr_vel[1]
                         psi_des = curr_yaw
-                        status_str = "STANDBY - POSITION LOCKED (CLICK MAP TO SET WAYPOINTS)"
+                        status_str = f"STANDBY HOVER ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f}) - CLICK MAP TO FLY"
 
                     # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
                     if abs(curr_pos[0]) > 20.0:
@@ -1050,12 +1068,18 @@ HTML_PAGE = """<!DOCTYPE html>
     <!-- Interactive City Flight Map & Waypoint Mission Planner -->
     <div class="card" id="card-mission-map">
       <div class="card-title">
-        <span>City Flight Map</span>
-        <span class="card-title-badge" id="badge-wp-status">4 WP ACTIVE</span>
+        <span>Tactical City Flight Map</span>
+        <span class="card-title-badge" id="badge-wp-status">STANDBY HOVER</span>
       </div>
       
-      <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-        Click anywhere on the map to add flight waypoints for the drone to follow.
+      <!-- Flight Navigation Mode Selection -->
+      <div class="mode-row cols-2" style="margin-bottom: 6px;">
+        <button class="btn active" id="mode-btn-flyto" onclick="setMapClickMode('fly_to')">🎯 Fly Directly Here</button>
+        <button class="btn" id="mode-btn-route" onclick="setMapClickMode('draw_route')">📍 Plot Patrol Route</button>
+      </div>
+
+      <div id="map-helper-text" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 6px;">
+        🎯 Click anywhere on the map to dispatch the drone directly to that location.
       </div>
 
       <!-- 2D Interactive Tactical Map Canvas -->
@@ -1065,8 +1089,8 @@ HTML_PAGE = """<!DOCTYPE html>
 
       <!-- Map Mission Controls -->
       <div class="mode-row cols-2" style="margin-top: 8px; margin-bottom: 6px;">
-        <button class="btn" id="btn-clear-wp" onclick="clearAllWaypoints()">🧹 Clear Path</button>
-        <button class="btn active" id="btn-loop-wp" onclick="toggleWaypointLoop()">🔁 Loop: ON</button>
+        <button class="btn" id="btn-clear-wp" onclick="clearAllWaypoints()">🧹 Clear Path / Hover</button>
+        <button class="btn" id="btn-loop-wp" onclick="toggleWaypointLoop()">🔁 Loop: OFF</button>
       </div>
 
       <!-- Mission Presets -->
@@ -1245,10 +1269,13 @@ function sendCommand(msg) {
     if (msg.action === 'inject_damage') fetch('/inject_damage?rotor=' + msg.rotor);
     else if (msg.action === 'set_camera') fetch('/set_camera?cam=' + msg.cam);
     else if (msg.action === 'set_controller') fetch('/set_controller?ctrl=' + msg.ctrl);
+    else if (msg.action === 'fly_to') fetch(`/fly_to?x=${msg.x}&y=${msg.y}`);
     else if (msg.action === 'clear_waypoints') fetch('/clear_waypoints');
+    else if (msg.action === 'add_waypoint') fetch(`/add_waypoint?x=${msg.x}&y=${msg.y}`);
     else if (msg.action === 'set_waypoints') {
-      fetch('/clear_waypoints');
-      (msg.waypoints || []).forEach(wp => fetch(`/add_waypoint?x=${wp.x}&y=${wp.y}`));
+      fetch('/clear_waypoints').then(() => {
+        (msg.waypoints || []).forEach(wp => fetch(`/add_waypoint?x=${wp.x}&y=${wp.y}`));
+      });
     }
     else if (msg.action === 'reset') fetch('/reset');
   }
@@ -1284,36 +1311,62 @@ function toggleFullscreen() {
 // -------------------------------------------------------------
 // Interactive 2D Tactical City Flight Map & Waypoint System
 // -------------------------------------------------------------
-let waypoints = [
-  { x: 8.0, y: 0.0 },
-  { x: 8.0, y: 8.0 },
-  { x: -8.0, y: 8.0 },
-  { x: -8.0, y: -8.0 }
-];
-let loopMode = true;
+let waypoints = [];
+let loopMode = false;
+let mapClickMode = 'fly_to'; // 'fly_to' (instant dispatch) or 'draw_route' (multi-waypoint)
 let activeWpIndex = 0;
 let latestDroneData = { x: 0, y: 0, yaw: 0 };
 
 const missionCanvas = document.getElementById('mission-canvas');
 const mCtx = missionCanvas ? missionCanvas.getContext('2d') : null;
 
-function updateBadge() {
-  const badge = document.getElementById('badge-wp-status');
-  if (badge) {
-    badge.innerText = waypoints.length > 0 ? (waypoints.length + ' WP ACTIVE') : 'STANDBY HOVER';
-    badge.style.color = waypoints.length > 0 ? 'var(--accent-cyan)' : 'var(--accent-amber)';
+function setMapClickMode(mode) {
+  mapClickMode = mode;
+  const btnFly = document.getElementById('mode-btn-flyto');
+  const btnRoute = document.getElementById('mode-btn-route');
+  if (btnFly) btnFly.classList.toggle('active', mode === 'fly_to');
+  if (btnRoute) btnRoute.classList.toggle('active', mode === 'draw_route');
+  const helper = document.getElementById('map-helper-text');
+  if (helper) {
+    helper.innerText = mode === 'fly_to' 
+      ? '🎯 Click anywhere on the map to dispatch the drone directly to that location.' 
+      : '📍 Click multiple points to plot a custom waypoint sequence route.';
   }
 }
 
-function syncWaypoints() {
-  sendCommand({ action: 'set_waypoints', waypoints: waypoints, loop: loopMode });
+function updateBadge() {
+  const badge = document.getElementById('badge-wp-status');
+  if (badge) {
+    if (waypoints.length === 0) {
+      badge.innerText = 'STANDBY HOVER';
+      badge.style.color = 'var(--accent-amber)';
+    } else if (waypoints.length === 1 && !loopMode) {
+      badge.innerText = `TARGET (${waypoints[0].x}, ${waypoints[0].y})`;
+      badge.style.color = 'var(--accent-cyan)';
+    } else {
+      badge.innerText = `${waypoints.length} WP ${loopMode ? 'PATROL' : 'ROUTE'}`;
+      badge.style.color = 'var(--accent-emerald)';
+    }
+  }
+}
+
+function syncWaypoints(resetIdx = true) {
+  sendCommand({ action: 'set_waypoints', waypoints: waypoints, loop: loopMode, reset_idx: resetIdx });
   updateBadge();
   drawMissionMap();
 }
 
 function clearAllWaypoints() {
   waypoints = [];
-  syncWaypoints();
+  loopMode = false;
+  const btn = document.getElementById('btn-loop-wp');
+  if (btn) {
+    btn.classList.remove('active');
+    btn.innerText = '🔁 Loop: OFF';
+  }
+  sendCommand({ action: 'clear_waypoints' });
+  updateBadge();
+  drawMissionMap();
 }
 
 function toggleWaypointLoop() {
@@ -1323,7 +1376,9 @@ function toggleWaypointLoop() {
     btn.classList.toggle('active', loopMode);
     btn.innerText = loopMode ? '🔁 Loop: ON' : '⏹️ Loop: OFF';
   }
-  syncWaypoints();
+  if (waypoints.length > 0) {
+    syncWaypoints(false);
+  }
 }
 
 function loadPreset(type) {
@@ -1336,29 +1391,31 @@ function loadPreset(type) {
     ];
   } else if (type === 'avenue') {
     waypoints = [
-      { x: 14.0, y: 0.0 },
-      { x: 0.0, y: 12.0 },
-      { x: -14.0, y: 0.0 },
-      { x: 0.0, y: -12.0 }
+      { x: 12.0, y: 0.0 },
+      { x: 0.0, y: 14.0 },
+      { x: -12.0, y: 0.0 },
+      { x: 0.0, y: -14.0 }
     ];
   } else if (type === 'skyline') {
     waypoints = [
-      { x: 12.0, y: 12.0 },
-      { x: -12.0, y: 12.0 },
-      { x: -12.0, y: -12.0 },
-      { x: 12.0, y: -12.0 }
+      { x: 14.0, y: 14.0 },
+      { x: -14.0, y: 14.0 },
+      { x: -14.0, y: -14.0 },
+      { x: 14.0, y: -14.0 }
     ];
   }
   loopMode = true;
+  mapClickMode = 'draw_route';
+  setMapClickMode('draw_route');
   const btn = document.getElementById('btn-loop-wp');
   if (btn) {
     btn.classList.add('active');
     btn.innerText = '🔁 Loop: ON';
   }
-  syncWaypoints();
+  syncWaypoints(true);
 }
 
-// Click anywhere on map to add waypoint
+// Click anywhere on map to add waypoint or dispatch drone
 if (missionCanvas) {
   missionCanvas.addEventListener('click', (e) => {
     const rect = missionCanvas.getBoundingClientRect();
@@ -1376,8 +1433,23 @@ if (missionCanvas) {
     const clampedX = Math.max(-18.0, Math.min(18.0, cityX));
     const clampedY = Math.max(-18.0, Math.min(18.0, cityY));
 
-    waypoints.push({ x: clampedX, y: clampedY });
-    syncWaypoints();
+    if (mapClickMode === 'fly_to') {
+      // Instant Direct Dispatch Mode: Clears old route, immediately locks onto this target
+      waypoints = [{ x: clampedX, y: clampedY }];
+      loopMode = false;
+      const loopBtn = document.getElementById('btn-loop-wp');
+      if (loopBtn) {
+        loopBtn.classList.remove('active');
+        loopBtn.innerText = '🔁 Loop: OFF';
+      }
+      sendCommand({ action: 'fly_to', x: clampedX, y: clampedY });
+      updateBadge();
+      drawMissionMap();
+    } else {
+      // Plot Route Mode: Append waypoint to sequence
+      waypoints.push({ x: clampedX, y: clampedY });
+      syncWaypoints(false);
+    }
   });
 }
 
@@ -1389,11 +1461,11 @@ function drawMissionMap(data) {
   const cy = h / 2;
   const scale = 5.8;
 
-  // Background
-  mCtx.fillStyle = '#070d18';
+  // Background Dark Urban Tactical Canvas
+  mCtx.fillStyle = '#060a12';
   mCtx.fillRect(0, 0, w, h);
 
-  // Concentric Distance Rings
+  // Concentric Distance Rings & Labels
   [5, 10, 15].forEach(r => {
     mCtx.beginPath();
     mCtx.arc(cx, cy, r * scale, 0, Math.PI * 2);
@@ -1409,13 +1481,13 @@ function drawMissionMap(data) {
 
   // Roads: North-South Avenue & East-West Boulevard
   const roadHalfW = 3.2 * scale;
-  mCtx.fillStyle = 'rgba(26, 36, 52, 0.85)';
+  mCtx.fillStyle = 'rgba(22, 28, 38, 0.95)';
   mCtx.fillRect(cx - roadHalfW, 0, roadHalfW * 2, h);
   mCtx.fillRect(0, cy - roadHalfW, w, roadHalfW * 2);
 
-  // Road Centerlines
-  mCtx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-  mCtx.lineWidth = 1;
+  // Yellow Road Centerlines
+  mCtx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+  mCtx.lineWidth = 1.2;
   mCtx.setLineDash([4, 4]);
   mCtx.beginPath();
   mCtx.moveTo(cx, 0); mCtx.lineTo(cx, h);
@@ -1423,54 +1495,85 @@ function drawMissionMap(data) {
   mCtx.stroke();
   mCtx.setLineDash([]);
 
-  // Grand Plaza
-  const plazaSize = 4.5 * scale;
-  mCtx.fillStyle = 'rgba(40, 55, 80, 0.6)';
+  // Grand Plaza (with Star Compass Rose representation)
+  const plazaSize = 4.2 * scale;
+  mCtx.fillStyle = 'rgba(38, 48, 65, 0.75)';
   mCtx.fillRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
-  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
   mCtx.lineWidth = 1;
   mCtx.strokeRect(cx - plazaSize, cy - plazaSize, plazaSize * 2, plazaSize * 2);
 
-  mCtx.fillStyle = 'rgba(56, 189, 248, 0.6)';
-  mCtx.font = '8px JetBrains Mono, monospace';
-  mCtx.textAlign = 'center';
-  mCtx.fillText('PLAZA', cx, cy + 3);
+  // Central Fountain Circle
+  mCtx.beginPath();
+  mCtx.arc(cx, cy, 1.2 * scale, 0, Math.PI * 2);
+  mCtx.fillStyle = 'rgba(14, 116, 144, 0.6)';
+  mCtx.fill();
+  mCtx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+  mCtx.stroke();
 
-  // 4 Skyscraper Towers Footprints
+  mCtx.fillStyle = 'rgba(224, 242, 254, 0.8)';
+  mCtx.font = 'bold 8px JetBrains Mono, monospace';
+  mCtx.textAlign = 'center';
+  mCtx.fillText('PLAZA', cx, cy - 1.8 * scale);
+
+  // 4 Iconic Real City Landmarks
   const towerPositions = [
-    { name: 'NE TOWER', x: 16, y: 16, color: '#38bdf8' },
-    { name: 'NW TOWER', x: -16, y: 16, color: '#f43f5e' },
-    { name: 'SW TOWER', x: -16, y: -16, color: '#10b981' },
-    { name: 'SE TOWER', x: 16, y: -16, color: '#a855f7' }
+    { name: 'HORIZON TOWER', sub: '[H] HELIPAD', x: 16, y: 16, color: '#38bdf8', bg: 'rgba(14, 45, 75, 0.9)' },
+    { name: 'METRO LOFTS', sub: '[WT] BRICK', x: -16, y: 16, color: '#f43f5e', bg: 'rgba(65, 25, 25, 0.9)' },
+    { name: 'APEX CORP', sub: '[AC] OBSIDIAN', x: -16, y: -16, color: '#fbbf24', bg: 'rgba(50, 40, 15, 0.9)' },
+    { name: 'VANGUARD', sub: '[SG] SKY-GARDEN', x: 16, y: -16, color: '#10b981', bg: 'rgba(15, 50, 35, 0.9)' }
   ];
-  const towerSize = 3.6 * scale;
+  const towerSize = 4.0 * scale;
   towerPositions.forEach(t => {
     const tx = cx + t.x * scale;
     const ty = cy - t.y * scale;
-    mCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    mCtx.fillStyle = t.bg;
     mCtx.fillRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
     mCtx.strokeStyle = t.color;
-    mCtx.lineWidth = 1.2;
+    mCtx.lineWidth = 1.4;
     mCtx.strokeRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
     mCtx.fillStyle = t.color;
-    mCtx.font = '7px JetBrains Mono, monospace';
-    mCtx.fillText(t.name, tx, ty + 2);
+    mCtx.font = 'bold 7px JetBrains Mono, monospace';
+    mCtx.fillText(t.name, tx, ty - 2);
+    mCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    mCtx.font = '6px JetBrains Mono, monospace';
+    mCtx.fillText(t.sub, tx, ty + 7);
+  });
+
+  // Avenue Infill Blocks along Canyons
+  const infillBlocks = [
+    { x: 0, y: 29, w: 7.0, h: 3.5, label: 'N. CANYON' },
+    { x: 0, y: -29, w: 7.0, h: 3.5, label: 'S. CANYON' },
+    { x: 29, y: 0, w: 3.5, h: 7.0, label: 'E. CANYON' },
+    { x: -29, y: 0, w: 3.5, h: 7.0, label: 'W. CANYON' }
+  ];
+  infillBlocks.forEach(b => {
+    const bx = cx + b.x * scale;
+    const by = cy - b.y * scale;
+    mCtx.fillStyle = 'rgba(20, 25, 35, 0.85)';
+    mCtx.fillRect(bx - (b.w/2)*scale, by - (b.h/2)*scale, b.w*scale, b.h*scale);
+    mCtx.strokeStyle = 'rgba(71, 85, 105, 0.7)';
+    mCtx.lineWidth = 1;
+    mCtx.strokeRect(bx - (b.w/2)*scale, by - (b.h/2)*scale, b.w*scale, b.h*scale);
+    mCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+    mCtx.font = '6px JetBrains Mono, monospace';
+    mCtx.fillText(b.label, bx, by + 2);
   });
 
   // Avenue Axis Labels
-  mCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  mCtx.fillStyle = 'rgba(148, 163, 184, 0.7)';
   mCtx.font = '8px JetBrains Mono, monospace';
-  mCtx.fillText('N. AVENUE', cx, 12);
-  mCtx.fillText('S. AVENUE', cx, h - 5);
+  mCtx.fillText('NORTH AVENUE (Y+)', cx, 12);
+  mCtx.fillText('SOUTH AVENUE (Y-)', cx, h - 5);
   mCtx.textAlign = 'left';
-  mCtx.fillText('W. BLVD', 6, cy - 5);
+  mCtx.fillText('WEST BLVD (X-)', 6, cy - 5);
   mCtx.textAlign = 'right';
-  mCtx.fillText('E. BLVD', w - 6, cy - 5);
+  mCtx.fillText('EAST BLVD (X+)', w - 6, cy - 5);
   mCtx.textAlign = 'center';
 
   // Draw Waypoint Flight Path
   if (waypoints.length > 0) {
-    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+    mCtx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
     mCtx.lineWidth = 2;
     mCtx.setLineDash([4, 4]);
     mCtx.beginPath();
@@ -1520,7 +1623,7 @@ function drawMissionMap(data) {
 
     // Glowing halo
     mCtx.beginPath();
-    mCtx.arc(dx, dy, 10, 0, Math.PI * 2);
+    mCtx.arc(dx, dy, 11, 0, Math.PI * 2);
     mCtx.fillStyle = 'rgba(56, 189, 248, 0.25)';
     mCtx.fill();
 
@@ -1543,6 +1646,23 @@ function drawMissionMap(data) {
     mCtx.strokeStyle = '#38bdf8';
     mCtx.lineWidth = 2;
     mCtx.stroke();
+
+    // Target tracking vector from drone to current target waypoint
+    if (waypoints.length > 0 && data.wp_index && data.wp_index <= waypoints.length) {
+      const tw = waypoints[data.wp_index - 1];
+      const tx = cx + tw.x * scale;
+      const ty = cy - tw.y * scale;
+      mCtx.beginPath();
+      mCtx.moveTo(dx, dy);
+      mCtx.lineTo(tx, ty);
+      mCtx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+      mCtx.lineWidth = 1;
+      mCtx.setLineDash([2, 3]);
+      mCtx.stroke();
+      mCtx.setLineDash([]);
+    }
+  }
+}
 
     // Target tracking vector from drone to current target waypoint
     if (waypoints.length > 0 && data.wp_index && data.wp_index <= waypoints.length) {
@@ -1617,6 +1737,9 @@ class StreamingHandler(BaseHTTPRequestHandler):
         if path == "/" or path == "/index.html":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.end_headers()
             ws_port = getattr(self.worker, "ws_port", 8081)
             page = HTML_PAGE.replace("const wsPort = 8081;", f"const wsPort = {ws_port};")
@@ -1675,6 +1798,16 @@ class StreamingHandler(BaseHTTPRequestHandler):
         elif path == "/set_mode":
             mode = params.get("mode", ["waypoint"])[0]
             self.worker.set_mode(mode)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'{"status": "ok"}')
+
+        elif path == "/fly_to":
+            x = float(params.get("x", [0.0])[0])
+            y = float(params.get("y", [0.0])[0])
+            self.worker.fly_to(x, y)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
