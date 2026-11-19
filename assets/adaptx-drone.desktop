@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ADAPT-X Photorealistic 3D Drone Simulator
+GenericName=3D Drone Flight Simulator
+Comment=Photorealistic 3D City Simulation: Animated Water Fountain, Detailed 3D Traffic, Organic Trees, Real-Time Rotor Dynamics, 2D Tactical Mission Map & Anti-Collision Containment
+Exec=/home/piet/ADAPT-X/launch_adaptx.sh
+Icon=/home/piet/ADAPT-X/assets/drone_logo.png
+Terminal=true
+Path=/home/piet/ADAPT-X
+Categories=Science;Simulation;Engineering;
+StartupNotify=true
+Keywords=drone;simulation;mujoco;rl;robotics;adaptx;photorealistic;city;
