@@ -1110,7 +1110,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <script>
 // High-Performance WebSocket Streaming & Canvas Rendering
 const canvas = document.getElementById('stream-canvas');
-const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+const ctx = canvas.getContext('2d', { alpha: false });
 
 let clientFrameCount = 0;
 let lastFpsTime = performance.now();
@@ -1210,15 +1210,19 @@ function connectWebSocket() {
 
         const jpegBytes = new Uint8Array(buf, 4 + jsonLen);
         const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
-        if (window.createImageBitmap) {
-          const bmp = await createImageBitmap(blob);
-          if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
-            canvas.width = bmp.width;
-            canvas.height = bmp.height;
+        try {
+          if (window.createImageBitmap) {
+            const bmp = await createImageBitmap(blob);
+            if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+              canvas.width = bmp.width;
+              canvas.height = bmp.height;
+            }
+            ctx.drawImage(bmp, 0, 0);
+            bmp.close();
+          } else {
+            throw new Error("No createImageBitmap");
           }
-          ctx.drawImage(bmp, 0, 0);
-          bmp.close();
-        } else {
+        } catch (renderErr) {
           const url = URL.createObjectURL(blob);
           const img = new Image();
           img.onload = () => {
@@ -1646,23 +1650,6 @@ function drawMissionMap(data) {
     mCtx.strokeStyle = '#38bdf8';
     mCtx.lineWidth = 2;
     mCtx.stroke();
-
-    // Target tracking vector from drone to current target waypoint
-    if (waypoints.length > 0 && data.wp_index && data.wp_index <= waypoints.length) {
-      const tw = waypoints[data.wp_index - 1];
-      const tx = cx + tw.x * scale;
-      const ty = cy - tw.y * scale;
-      mCtx.beginPath();
-      mCtx.moveTo(dx, dy);
-      mCtx.lineTo(tx, ty);
-      mCtx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-      mCtx.lineWidth = 1;
-      mCtx.setLineDash([2, 3]);
-      mCtx.stroke();
-      mCtx.setLineDash([]);
-    }
-  }
-}
 
     // Target tracking vector from drone to current target waypoint
     if (waypoints.length > 0 && data.wp_index && data.wp_index <= waypoints.length) {
