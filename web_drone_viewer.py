@@ -26,18 +26,17 @@ if os.path.exists(venv_python) and sys.executable != venv_python:
     except ImportError:
         os.execv(venv_python, [venv_python] + sys.argv)
 
-import time
-import json
-import io
 import asyncio
+import json
 import threading
-from urllib.parse import urlparse, parse_qs
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+from urllib.parse import parse_qs, urlparse
 
 import cv2
-import numpy as np
 import mujoco
+import numpy as np
 import websockets
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -93,9 +92,9 @@ class WebSocketBroadcaster:
                                 self.worker.add_waypoint(data.get("x", 0.0), data.get("y", 0.0), data.get("z", None))
                             elif action == "toggle_loop":
                                 self.worker.toggle_loop()
-                    except Exception:
-                        pass
-            except Exception:
+                    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+                        continue
+            except (websockets.ConnectionClosed, websockets.WebSocketException, asyncio.CancelledError):
                 pass
             finally:
                 self.clients.discard(websocket)
@@ -177,7 +176,7 @@ class SimulationWorker:
             try:
                 self.ort_session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
                 print(f"[SimulationWorker] Loaded ADAPT-X Heavy Drone ONNX Model: {onnx_model_path}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"[SimulationWorker] ONNX load warning: {e}")
 
         # Control gains tuned for high-speed dynamic city canyon navigation
@@ -318,7 +317,6 @@ class SimulationWorker:
         while self.is_running:
             loop_start = time.perf_counter()
             self.step_count += 1
-            t = self.step_count * 0.02
 
             with self.state_lock:
                 curr_pos = self.env.data.qpos[0:3].copy()
@@ -442,7 +440,7 @@ class SimulationWorker:
                     status_str = f"⚡ ROTOR {self.damage_motor.upper()} CUT - EMERGENCY RECOVERY ACTIVE (ALTITUDE & POSITION LOCKED)"
 
                 # Step physics with adaptive history tracking
-                obs, hist, reward, terminated, truncated, _ = self.env.step_adaptive(action)
+                _obs, _hist, _reward, terminated, truncated, _ = self.env.step_adaptive(action)
                 if terminated or truncated:
                     self.env.reset_adaptive()
                     if self.damage_motor != "none":
