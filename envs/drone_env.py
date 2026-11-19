@@ -8,6 +8,8 @@ try:
 except ImportError:
     mujoco = None
 
+from envs.obstacle_map import CityObstacleMap
+
 
 class CityDroneEnv(gym.Env):
     """
@@ -87,12 +89,42 @@ class CityDroneEnv(gym.Env):
         self.history_dim = self.history_len * self.single_proprio_dim
         self.history_buf = np.zeros((self.history_len, self.single_proprio_dim), dtype=np.float32)
 
+        # Urban Obstacle Map & Precise MuJoCo Collision Discovery
+        self.obstacle_map = CityObstacleMap(drone_radius=0.45)
+        self.drone_geoms = {g for g in range(self.model.ngeom) if self.model.geom_bodyid[g] == self.drone_body_id}
+        ground_names = {"ground", "grand_plaza_border", "grand_plaza_mosaic", "boulevard_ns", "boulevard_ew"}
+        self.ground_geoms = {
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            for name in ground_names
+            if mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name) != -1
+        }
+        self.obstacle_geoms = set(range(self.model.ngeom)) - self.drone_geoms - self.ground_geoms
+        self.randomize_target = False
+
+    def sample_safe_avenue_target(self):
+        """Samples a collision-free target position along the open city avenues and corridors."""
+        avenues = [
+            (0.0, float(np.random.uniform(-16.0, 16.0)), 5.2),
+            (float(np.random.uniform(-16.0, 16.0)), 0.0, 5.2),
+            (float(np.random.uniform(-5.5, 5.5)), float(np.random.uniform(-5.5, 5.5)), 5.2),
+            (float(np.random.choice([-16.0, 16.0])), float(np.random.choice([-6.0, 6.0])), 5.2),
+            (float(np.random.choice([-6.0, 6.0])), float(np.random.choice([-16.0, 16.0])), 5.2),
+        ]
+        chosen = avenues[int(np.random.choice(len(avenues)))]
+        pt = self.obstacle_map.snap_to_safe_corridor(chosen[0], chosen[1], z=chosen[2])
+        return pt.astype(np.float32)
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
 
-        # Initial drone state: pos (0, 0, target_z), orientation quat [1, 0, 0, 0]
-        self.data.qpos[0:3] = self.target_pos
+        if getattr(self, "randomize_target", False):
+            self.target_pos = self.sample_safe_avenue_target()
+            start_x, start_y = 0.0, 0.0
+            start_z = float(self.target_pos[2]) if len(self.target_pos) > 2 else 5.2
+            self.data.qpos[0:3] = [start_x, start_y, start_z]
+        else:
+            self.data.qpos[0:3] = self.target_pos
         self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
         self.data.qvel[:] = 0.0
 
@@ -162,12 +194,16 @@ class CityDroneEnv(gym.Env):
             sinp = float(np.clip(2.0 * (w * y_q - z_q * x_q), -1.0, 1.0))
             pitch = np.arcsin(sinp)
 
-            # Active FBW trajectory navigation guidance assist towards target velocity
+            # Active FBW trajectory navigation guidance assist towards target velocity + APF obstacle repulsion
             v_target = getattr(self, "target_velocity", np.zeros(2))
             v_err = v_target - vel[0:2]
             f_guidance = np.clip(3.5 * v_err, -7.0, 7.0)
 
-            self.data.qfrc_applied[0:2] = f_guidance - 0.20 * vel[0:2]
+            # Active APF building wall repulsion in damaged mode
+            f_apf, _ = self.obstacle_map.compute_apf_force(self.data.qpos[0:3], vel)
+            f_apf_clamped = np.clip(f_apf[0:2], -6.0, 6.0)
+
+            self.data.qfrc_applied[0:2] = f_guidance + f_apf_clamped - 0.20 * vel[0:2]
             self.data.qfrc_applied[2] = -0.25 * vel[2]
             self.data.qfrc_applied[3] = -0.45 * omega[0] - 4.5 * roll
             self.data.qfrc_applied[4] = -0.45 * omega[1] - 4.5 * pitch
@@ -187,38 +223,62 @@ class CityDroneEnv(gym.Env):
 
         obs = self._get_obs()
 
+        # Check physical contact collision between drone and any city obstacle geom
+        obstacle_collision = False
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            if (c.geom1 in self.drone_geoms and c.geom2 in self.obstacle_geoms) or \
+               (c.geom2 in self.drone_geoms and c.geom1 in self.obstacle_geoms):
+                obstacle_collision = True
+                break
+
         # Compute position error and horizontal radius from central plaza
         curr_pos = self.data.qpos[0:3]
         curr_vel = self.data.qvel[0:3]
+        pos_err_3d = curr_pos - self.target_pos
+        dist_to_target = float(np.linalg.norm(pos_err_3d))
+        if getattr(self, "randomize_target", False) and dist_to_target < 0.75:
+            # Reached waypoint cleanly without colliding: reward and advance to next target
+            self.target_pos = self.sample_safe_avenue_target()
+            dist_to_target = float(np.linalg.norm(curr_pos - self.target_pos))
         r_horiz = float(np.hypot(curr_pos[0], curr_pos[1]))
         v_horiz = float(np.hypot(curr_vel[0], curr_vel[1]))
         z_err = float(abs(curr_pos[2] - self.target_pos[2]))
         upright = float(np.clip(self.data.qpos[3], 0.0, 1.0))
 
-        # Reward shaping: Prioritize tight central plaza containment & altitude stability
+        # Obstacle clearance penalty via APF distance
+        _f_apf, d_min_obs = self.obstacle_map.compute_apf_force(curr_pos, curr_vel)
+        penalty_obstacle = 0.0
+        if d_min_obs < 1.8:
+            penalty_obstacle = 12.0 * ((1.8 - d_min_obs) ** 2)
+
+        # Reward shaping: Progress to target, upright stabilization, altitude hold, obstacle clearance
+        r_target = np.exp(-1.2 * dist_to_target)
         r_z = np.exp(-3.0 * z_err)
-        r_pos = np.exp(-1.5 * r_horiz)
-        r_vel = np.exp(-1.0 * v_horiz)
-        penalty_geofence = 0.0
-        if r_horiz > 2.0:
-            penalty_geofence = 6.0 * ((r_horiz - 2.0) ** 2)
+        r_vel = np.exp(-0.8 * v_horiz)
 
-        reward = float(6.0 * r_z + 4.0 * r_pos + 2.0 * r_vel + 2.0 * upright - penalty_geofence - 0.01 * np.sum(action))
+        reward = float(6.0 * r_target + 4.0 * r_z + 2.0 * r_vel + 2.0 * upright - penalty_obstacle - 0.01 * np.sum(action))
 
-        # Terminate if crashed to ground, breached urban geofence radius, or breached ceiling
+        # Terminate if crashed to ground, hit building/obstacle, breached urban geofence radius, or breached ceiling
         ground_crash = bool(curr_pos[2] < 0.45)
         building_perimeter = bool(r_horiz > self.max_radius)
         ceiling_breach = bool(curr_pos[2] > self.max_altitude)
 
-        terminated = ground_crash or building_perimeter or ceiling_breach
+        terminated = ground_crash or building_perimeter or ceiling_breach or obstacle_collision
         if terminated and (self.max_steps is None or self.current_step < self.max_steps):
-            reward -= 50.0  # Harsh penalty for any crash or boundary collision
+            if obstacle_collision:
+                reward -= 100.0  # Severe penalty for striking buildings or objects
+            else:
+                reward -= 50.0   # Penalty for ground crash or ceiling breach
 
         truncated = bool(self.max_steps is not None and self.current_step >= self.max_steps)
 
         info = {
             "altitude": float(curr_pos[2]),
             "r_horiz": r_horiz,
+            "dist_target": dist_to_target,
+            "d_min_obs": float(d_min_obs),
+            "obstacle_collision": obstacle_collision,
             "thrust": actual_thrust.tolist(),
             "health": self.rotor_health.tolist(),
             "fault": self.fault_type,
@@ -226,6 +286,8 @@ class CityDroneEnv(gym.Env):
             "ground_crash": ground_crash,
             "building_perimeter": building_perimeter,
         }
+
+        return obs, reward, terminated, truncated, info
 
         return obs, reward, terminated, truncated, info
 

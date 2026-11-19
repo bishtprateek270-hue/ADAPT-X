@@ -41,6 +41,7 @@ import websockets
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from envs.drone_env import CityDroneEnv
+from envs.obstacle_map import CityObstacleMap
 
 try:
     import onnxruntime as ort
@@ -122,10 +123,11 @@ class WebSocketBroadcaster:
 
 
 class SimulationWorker:
-    def __init__(self, target_altitude=4.5, width=1280, height=720, jpeg_quality=85):
+    def __init__(self, target_altitude=5.2, width=1280, height=720, jpeg_quality=85):
         self.target_altitude = target_altitude
         self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=28.0, max_altitude=16.0, max_steps=1000000)
         self.env.reset_adaptive()
+        self.obstacle_map = getattr(self.env, "obstacle_map", CityObstacleMap(drone_radius=0.45))
 
         # Configurable resolution: 720p (1280x720), 1080p (1920x1080), or 450p (800x450)
         self.width = width
@@ -246,19 +248,27 @@ class SimulationWorker:
         with self.state_lock:
             if z is None:
                 z = self.target_altitude
-            self.waypoints = [np.array([float(x), float(y), float(z)])]
+            curr_pos = self.env.data.qpos[0:3].copy()
+            # Plan collision-free urban canyon path routing around skyscrapers
+            corridor_path = self.obstacle_map.plan_corridor_route(curr_pos[:2], [float(x), float(y)], z=float(z))
+            self.waypoints = [np.array([float(p[0]), float(p[1]), float(p[2])]) for p in corridor_path]
             self.wp_index = 0
             self.loop_waypoints = False
 
     def set_waypoints(self, wps, loop=False, reset_idx=True):
         with self.state_lock:
-            new_wps = []
+            curr_pos = self.env.data.qpos[0:3].copy()
+            expanded_wps = []
+            prev_pt = curr_pos
             for wp in wps:
                 x = float(wp.get("x", 0.0))
                 y = float(wp.get("y", 0.0))
                 z = float(wp.get("z", self.target_altitude))
-                new_wps.append(np.array([x, y, z]))
-            self.waypoints = new_wps
+                sub_path = self.obstacle_map.plan_corridor_route(prev_pt[:2], [x, y], z=z)
+                for pt in sub_path:
+                    expanded_wps.append(np.array([float(pt[0]), float(pt[1]), float(pt[2])]))
+                prev_pt = np.array([x, y, z])
+            self.waypoints = expanded_wps
             self.loop_waypoints = bool(loop)
             if reset_idx or self.wp_index >= len(self.waypoints):
                 self.wp_index = 0
@@ -269,7 +279,10 @@ class SimulationWorker:
         with self.state_lock:
             if z is None:
                 z = self.target_altitude
-            self.waypoints.append(np.array([float(x), float(y), float(z)]))
+            prev_pt = self.waypoints[-1] if self.waypoints else self.env.data.qpos[0:3]
+            sub_path = self.obstacle_map.plan_corridor_route(prev_pt[:2], [x, y], z=z)
+            for pt in sub_path:
+                self.waypoints.append(np.array([float(pt[0]), float(pt[1]), float(pt[2])]))
             self.wp_index = min(len(self.waypoints) - 1, self.wp_index)
 
     def clear_waypoints(self):
@@ -425,6 +438,23 @@ class SimulationWorker:
                     else:
                         status_str = f"STANDBY HOVER ({self.hover_pos[0]:+.1f}, {self.hover_pos[1]:+.1f}) - CLICK MAP TO FLY"
 
+                # -------------------------------------------------------------
+                # REAL-TIME ARTIFICIAL POTENTIAL FIELD (APF) OBSTACLE AVOIDANCE
+                # -------------------------------------------------------------
+                f_apf, d_min_obs = self.obstacle_map.compute_apf_force(curr_pos, curr_vel)
+
+                # Active speed scaling when nearing any building or obstacle
+                if d_min_obs < 2.5:
+                    speed_scale = float(np.clip((d_min_obs - 0.4) / 2.1, 0.20, 1.0))
+                    vx_des *= speed_scale
+                    vy_des *= speed_scale
+
+                # Inject APF repulsive acceleration into control vector
+                ax_req += float(np.clip(f_apf[0] / self.env.mass, -12.0, 12.0))
+                ay_req += float(np.clip(f_apf[1] / self.env.mass, -12.0, 12.0))
+                if f_apf[2] > 0.1:
+                    z_des = max(z_des, self.target_altitude + float(np.clip(f_apf[2] * 0.1, 0.0, 1.5)))
+
                 # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
                 if abs(curr_pos[0]) > 20.0:
                     ax_req -= 2.5 * np.sign(curr_pos[0]) * (abs(curr_pos[0]) - 20.0)
@@ -468,8 +498,9 @@ class SimulationWorker:
                     ez = z_des - curr_pos[2]
                     fz_req = np.clip((self.env.mass * 9.81 + 32.0 * ez - 8.5 * curr_vel[2]) / cos_tilt, 2.0, 24.0)
 
-                    # Direct active FBW guidance assist to steer directly along the trajectory
-                    self.env.target_velocity = np.array([vx_des, vy_des])
+                    # Direct active FBW guidance assist with APF obstacle repulsion
+                    apf_offset = np.clip(f_apf[:2] * 0.18, -1.5, 1.5)
+                    self.env.target_velocity = np.array([vx_des + apf_offset[0], vy_des + apf_offset[1]])
 
                     raw_forces = np.zeros(4)
                     raw_forces[pair[0]] = np.clip(fz_req / 2.0, 0.0, max_thrust)
@@ -542,6 +573,8 @@ class SimulationWorker:
                     "wp_index": (self.wp_index + 1) if self.waypoints else 0,
                     "wp_total": len(self.waypoints),
                     "wp_dist": wp_dist_val,
+                    "d_min_obs": round(float(d_min_obs), 2),
+                    "collision_shield": "ACTIVE (APF VORTEX)",
                     "loop_mode": self.loop_waypoints
                 }
 
@@ -1406,25 +1439,28 @@ function toggleWaypointLoop() {
 
 function loadPreset(type) {
   if (type === 'plaza') {
+    // Open Grand Plaza Perimeter Circuit (100% collision-free)
     waypoints = [
-      { x: 5.0, y: 5.0 },
-      { x: -5.0, y: 5.0 },
-      { x: -5.0, y: -5.0 },
-      { x: 5.0, y: -5.0 }
+      { x: 5.5, y: 0.0 },
+      { x: 0.0, y: 5.5 },
+      { x: -5.5, y: 0.0 },
+      { x: 0.0, y: -5.5 }
     ];
   } else if (type === 'avenue') {
+    // North-South & East-West Boulevard Corridor Flight
     waypoints = [
-      { x: 12.0, y: 0.0 },
-      { x: 0.0, y: 14.0 },
-      { x: -12.0, y: 0.0 },
-      { x: 0.0, y: -14.0 }
+      { x: 16.0, y: 0.0 },
+      { x: 0.0, y: 16.0 },
+      { x: -16.0, y: 0.0 },
+      { x: 0.0, y: -16.0 }
     ];
-  } else if (type === 'skyline') {
+  } else if (type === 'skyline' || type === 'canyon') {
+    // City Canyon Outer Boulevard Patrol (Navigates cleanly between skyscrapers)
     waypoints = [
-      { x: 14.0, y: 14.0 },
-      { x: -14.0, y: 14.0 },
-      { x: -14.0, y: -14.0 },
-      { x: 14.0, y: -14.0 }
+      { x: 18.0, y: 0.0 },
+      { x: 0.0, y: 18.0 },
+      { x: -18.0, y: 0.0 },
+      { x: 0.0, y: -18.0 }
     ];
   }
   loopMode = true;
@@ -1478,6 +1514,16 @@ if (missionCanvas) {
 
 function drawMissionMap(data) {
   if (!missionCanvas || !mCtx) return;
+
+  // Synchronize client waypoints from server planned corridor route
+  if (data && data.waypoints && Array.isArray(data.waypoints)) {
+    if (data.waypoints.length > 0) {
+      waypoints = data.waypoints.map(w => ({ x: w[0], y: w[1] }));
+    } else if (data.mode === 'hover') {
+      waypoints = [];
+    }
+  }
+
   const w = missionCanvas.width;
   const h = missionCanvas.height;
   const cx = w / 2;
@@ -1539,14 +1585,14 @@ function drawMissionMap(data) {
   mCtx.textAlign = 'center';
   mCtx.fillText('PLAZA', cx, cy - 1.8 * scale);
 
-  // 4 Iconic Real City Landmarks
+  // 4 Iconic Real City Landmarks (Skyscraper Collision Exclusion Zones)
   const towerPositions = [
-    { name: 'HORIZON TOWER', sub: '[H] HELIPAD', x: 16, y: 16, color: '#38bdf8', bg: 'rgba(14, 45, 75, 0.9)' },
-    { name: 'METRO LOFTS', sub: '[WT] BRICK', x: -16, y: 16, color: '#f43f5e', bg: 'rgba(65, 25, 25, 0.9)' },
-    { name: 'APEX CORP', sub: '[AC] OBSIDIAN', x: -16, y: -16, color: '#fbbf24', bg: 'rgba(50, 40, 15, 0.9)' },
-    { name: 'VANGUARD', sub: '[SG] SKY-GARDEN', x: 16, y: -16, color: '#10b981', bg: 'rgba(15, 50, 35, 0.9)' }
+    { name: 'HORIZON TOWER', sub: '🚫 NO-FLY ZONE', x: 16, y: 16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
+    { name: 'METRO LOFTS', sub: '🚫 NO-FLY ZONE', x: -16, y: 16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
+    { name: 'APEX CORP', sub: '🚫 NO-FLY ZONE', x: -16, y: -16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' },
+    { name: 'VANGUARD', sub: '🚫 NO-FLY ZONE', x: 16, y: -16, color: '#f43f5e', bg: 'rgba(65, 18, 28, 0.88)' }
   ];
-  const towerSize = 4.0 * scale;
+  const towerSize = 4.2 * scale;
   towerPositions.forEach(t => {
     const tx = cx + t.x * scale;
     const ty = cy - t.y * scale;
@@ -1554,12 +1600,14 @@ function drawMissionMap(data) {
     mCtx.fillRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
     mCtx.strokeStyle = t.color;
     mCtx.lineWidth = 1.4;
+    mCtx.setLineDash([3, 2]);
     mCtx.strokeRect(tx - towerSize/2, ty - towerSize/2, towerSize, towerSize);
-    mCtx.fillStyle = t.color;
+    mCtx.setLineDash([]);
+    mCtx.fillStyle = '#fca5a5';
     mCtx.font = 'bold 7px JetBrains Mono, monospace';
     mCtx.fillText(t.name, tx, ty - 2);
-    mCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    mCtx.font = '6px JetBrains Mono, monospace';
+    mCtx.fillStyle = '#f87171';
+    mCtx.font = 'bold 6px JetBrains Mono, monospace';
     mCtx.fillText(t.sub, tx, ty + 7);
   });
 
