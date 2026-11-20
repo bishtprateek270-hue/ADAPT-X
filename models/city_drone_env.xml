@@ -83,6 +83,15 @@
     <material name="beacon_police_blue" rgba="0.1 0.5 1.0 1.0" emission="2.2"/>
     <material name="beacon_police_red" rgba="1.0 0.08 0.08 1.0" emission="2.2"/>
 
+    <!-- Mahindra Scorpio-N Signature Realistic Materials -->
+    <material name="scorpio_napoli_black" rgba="0.03 0.03 0.04 1.0" reflectance="0.70" specular="0.99" shininess="0.98"/>
+    <material name="scorpio_deep_forest" rgba="0.06 0.20 0.14 1.0" reflectance="0.60" specular="0.98" shininess="0.96"/>
+    <material name="scorpio_cladding_matte" rgba="0.11 0.11 0.12 1.0" specular="0.12" shininess="0.1"/>
+    <material name="scorpio_skid_silver" rgba="0.84 0.86 0.90 1.0" specular="0.90" shininess="0.85"/>
+    <material name="scorpio_chrome" rgba="0.96 0.97 0.99 1.0" reflectance="0.85" specular="1.0" shininess="1.0"/>
+    <material name="scorpio_drl_led" rgba="0.98 0.99 1.0 1.0" emission="2.4"/>
+    <material name="scorpio_vert_tail" rgba="0.99 0.04 0.04 1.0" emission="2.0"/>
+
     <!-- Foliage / Realistic Trees -->
     <texture name="tree_leaf_tex" type="2d" file="textures/tree_leaf.png"/>
     <material name="tree_leaf_mat" texture="tree_leaf_tex" texrepeat="2 2" reflectance="0.1" specular="0.15"/>
@@ -406,47 +415,148 @@
       <geom type="cylinder" pos="-1.15 -0.84 0.23" size="0.23 0.10" zaxis="0 1 0" material="tire_rubber"/>
     </body>
 
-    <!-- CAR 3: Executive Obsidian Luxury SUV (pos=-5.0 16.5) -->
-    <body name="black_suv" pos="-5.0 16.5 0">
-      <geom type="box" pos="0 0 0.40" size="2.1 0.88 0.24" material="car_paint_black"/>
-      <geom type="box" pos="0 0 0.74" size="1.45 0.82 0.20" material="car_glass"/>
-      <geom type="box" pos="0 0 0.94" size="1.40 0.80 0.03" material="car_paint_black"/>
-      <!-- Roof Rack Rails -->
-      <geom type="capsule" fromto="1.1 0.65 0.98 -1.1 0.65 0.98" size="0.02" material="car_chrome"/>
-      <geom type="capsule" fromto="1.1 -0.65 0.98 -1.1 -0.65 0.98" size="0.02" material="car_chrome"/>
-      <!-- Front Chrome Grille & Headlights -->
-      <geom type="box" pos="2.08 0 0.42" size="0.04 0.50 0.16" material="car_chrome"/>
-      <geom type="cylinder" pos="2.08 0.62 0.45" size="0.08 0.02" zaxis="1 0 0" material="headlight_xenon"/>
-      <geom type="cylinder" pos="2.08 -0.62 0.45" size="0.08 0.02" zaxis="1 0 0" material="headlight_xenon"/>
-      <geom type="box" pos="-2.08 0.64 0.46" size="0.02 0.12 0.08" material="taillight_led"/>
-      <geom type="box" pos="-2.08 -0.64 0.46" size="0.02 0.12 0.08" material="taillight_led"/>
-      <!-- High-Clearance All-Terrain Wheels -->
-      <geom type="cylinder" pos="1.25 0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.25 0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="1.25 -0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.25 -0.90 0.28" size="0.28 0.11" zaxis="0 1 0" material="tire_rubber"/>
+    <!-- ================================================================= -->
+    <!-- REALISTIC VEHICLE: MAHINDRA SCORPIO-N Z8L (NAPOLI BLACK METALLIC) -->
+    <!-- ================================================================= -->
+    <body name="scorpio_n_napoli_black" pos="-5.0 16.5 0">
+      <!-- Main Muscular Monocoque Body Tub -->
+      <geom type="box" pos="0 0 0.52" size="2.33 0.95 0.28" material="scorpio_napoli_black"/>
+      <!-- Lower Rugged Body Cladding (Matte Black) -->
+      <geom type="box" pos="0 0 0.28" size="2.35 0.96 0.08" material="scorpio_cladding_matte"/>
+      <!-- Front Muscular Bumper & Air Dam -->
+      <geom type="box" pos="2.32 0 0.44" size="0.14 0.93 0.22" material="scorpio_napoli_black"/>
+      <geom type="box" pos="2.38 0 0.26" size="0.10 0.60 0.08" material="scorpio_skid_silver"/>
+      <!-- Rear Bumper & Skid Plate -->
+      <geom type="box" pos="-2.33 0 0.46" size="0.14 0.93 0.24" material="scorpio_napoli_black"/>
+      <geom type="box" pos="-2.38 0 0.28" size="0.10 0.60 0.08" material="scorpio_skid_silver"/>
+      
+      <!-- Signature Scorpio-N 6-Tooth Vertical Chrome Grille -->
+      <geom type="box" pos="2.40 0 0.58" size="0.03 0.62 0.14" material="scorpio_cladding_matte"/>
+      <geom type="capsule" fromto="2.42 0.45 0.50 2.42 0.45 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 0.27 0.50 2.42 0.27 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 0.09 0.50 2.42 0.09 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.09 0.50 2.42 -0.09 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.27 0.50 2.42 -0.27 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.45 0.50 2.42 -0.45 0.66" size="0.015" material="scorpio_chrome"/>
+      <!-- Mahindra Twin-Peaks Center Badge -->
+      <geom type="cylinder" pos="2.43 0 0.60" size="0.04 0.015" zaxis="1 0 0" material="scorpio_chrome"/>
+      
+      <!-- Twin-Pod Projector LED Headlamps & Eyebrow DRLs -->
+      <geom type="cylinder" pos="2.41 0.74 0.60" size="0.065 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 0.61 0.60" size="0.060 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 -0.74 0.60" size="0.065 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 -0.61 0.60" size="0.060 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.41 0.68 0.67" size="0.02 0.14 0.015" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.41 -0.68 0.67" size="0.02 0.14 0.015" material="scorpio_drl_led"/>
+      <!-- Sting C-Shaped Foglamp Housings in Lower Bumper -->
+      <geom type="box" pos="2.37 0.78 0.35" size="0.02 0.06 0.08" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.37 -0.78 0.35" size="0.02 0.06 0.08" material="scorpio_drl_led"/>
+
+      <!-- Greenhouse Cabin, A/B/C/D Pillars & Dark Privacy Glass -->
+      <geom type="box" pos="-0.12 0 0.96" size="1.55 0.88 0.24" material="car_glass"/>
+      <geom type="box" pos="-0.12 0 1.22" size="1.50 0.85 0.035" material="scorpio_napoli_black"/>
+      <!-- Silver Roof Rails -->
+      <geom type="capsule" fromto="1.10 0.68 1.27 -1.25 0.68 1.27" size="0.025" material="scorpio_skid_silver"/>
+      <geom type="capsule" fromto="1.10 -0.68 1.27 -1.25 -0.68 1.27" size="0.025" material="scorpio_skid_silver"/>
+      <!-- Scorpio Sting Chrome Windowline Accent (D-Pillar) -->
+      <geom type="box" pos="-1.28 0.89 0.98" size="0.22 0.015 0.20" material="scorpio_chrome"/>
+      <geom type="box" pos="-1.28 -0.89 0.98" size="0.22 0.015 0.20" material="scorpio_chrome"/>
+      <!-- Shark-fin Antenna -->
+      <geom type="box" pos="-1.35 0 1.29" size="0.08 0.02 0.045" material="scorpio_cladding_matte"/>
+      <!-- Dual-Tone ORVM Side Mirrors -->
+      <geom type="box" pos="1.15 1.08 0.85" size="0.10 0.14 0.07" material="scorpio_napoli_black"/>
+      <geom type="box" pos="1.15 -1.08 0.85" size="0.10 0.14 0.07" material="scorpio_napoli_black"/>
+
+      <!-- Signature Tall Vertical Scorpio LED Taillamp Towers -->
+      <geom type="box" pos="-2.33 0.78 0.86" size="0.02 0.06 0.30" material="scorpio_vert_tail"/>
+      <geom type="box" pos="-2.33 -0.78 0.86" size="0.02 0.06 0.30" material="scorpio_vert_tail"/>
+      <!-- Tailgate Chrome Applique & Badging -->
+      <geom type="box" pos="-2.34 0 0.68" size="0.015 0.45 0.035" material="scorpio_chrome"/>
+      <!-- Roof Spoiler with Stop Lamp -->
+      <geom type="box" pos="-1.65 0 1.23" size="0.18 0.72 0.03" material="scorpio_napoli_black"/>
+      <geom type="box" pos="-1.74 0 1.23" size="0.02 0.16 0.015" material="scorpio_vert_tail"/>
+
+      <!-- R18 Diamond Cut Alloy Wheels & High Ground Clearance -->
+      <geom type="cylinder" pos="1.40 0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.40 0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.40 0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.40 0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="1.40 -0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.40 -0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.40 -0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.40 -0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
     </body>
 
-    <!-- CAR 4: Highway Patrol / Police Emergency Cruiser (pos=-5.0 -8.5) -->
-    <body name="police_cruiser" pos="-5.0 -8.5 0">
-      <geom type="box" pos="0 0 0.28" size="1.85 0.78 0.16" material="police_white"/>
-      <geom type="box" pos="0.4 0 0.28" size="0.8 0.78 0.16" material="car_paint_black"/>
-      <geom type="box" pos="-0.4 0 0.28" size="0.8 0.78 0.16" material="car_paint_black"/>
-      <geom type="box" pos="-0.1 0 0.54" size="1.0 0.72 0.16" material="car_glass"/>
-      <geom type="box" pos="-0.1 0 0.68" size="0.95 0.68 0.03" material="police_white"/>
-      <!-- Front Heavy-Duty Push Bullbar -->
-      <geom type="box" pos="1.92 0 0.30" size="0.06 0.55 0.16" material="street_iron_mat"/>
-      <!-- Rooftop Emergency Lightbar (Red and Blue Strobe Beacons) -->
-      <geom type="box" pos="-0.1 0 0.74" size="0.12 0.45 0.03" material="street_iron_mat"/>
-      <geom type="box" pos="-0.1 -0.22 0.75" size="0.10 0.18 0.04" material="beacon_police_blue"/>
-      <geom type="box" pos="-0.1 0.22 0.75" size="0.10 0.18 0.04" material="beacon_police_red"/>
-      <!-- Headlights and Wheels -->
-      <geom type="cylinder" pos="1.84 0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
-      <geom type="cylinder" pos="1.84 -0.52 0.32" size="0.07 0.02" zaxis="1 0 0" material="headlight_xenon"/>
-      <geom type="cylinder" pos="1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.1 0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
-      <geom type="cylinder" pos="-1.1 -0.80 0.24" size="0.24 0.09" zaxis="0 1 0" material="tire_rubber"/>
+    <!-- ================================================================= -->
+    <!-- REALISTIC VEHICLE: MAHINDRA SCORPIO-N Z8L (DEEP FOREST METALLIC)  -->
+    <!-- ================================================================= -->
+    <body name="scorpio_n_deep_forest" pos="5.0 -8.5 0" quat="0 0 1 0">
+      <!-- Main Muscular Monocoque Body Tub -->
+      <geom type="box" pos="0 0 0.52" size="2.33 0.95 0.28" material="scorpio_deep_forest"/>
+      <!-- Lower Rugged Body Cladding (Matte Black) -->
+      <geom type="box" pos="0 0 0.28" size="2.35 0.96 0.08" material="scorpio_cladding_matte"/>
+      <!-- Front Muscular Bumper & Air Dam -->
+      <geom type="box" pos="2.32 0 0.44" size="0.14 0.93 0.22" material="scorpio_deep_forest"/>
+      <geom type="box" pos="2.38 0 0.26" size="0.10 0.60 0.08" material="scorpio_skid_silver"/>
+      <!-- Rear Bumper & Skid Plate -->
+      <geom type="box" pos="-2.33 0 0.46" size="0.14 0.93 0.24" material="scorpio_deep_forest"/>
+      <geom type="box" pos="-2.38 0 0.28" size="0.10 0.60 0.08" material="scorpio_skid_silver"/>
+      
+      <!-- Signature Scorpio-N 6-Tooth Vertical Chrome Grille -->
+      <geom type="box" pos="2.40 0 0.58" size="0.03 0.62 0.14" material="scorpio_cladding_matte"/>
+      <geom type="capsule" fromto="2.42 0.45 0.50 2.42 0.45 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 0.27 0.50 2.42 0.27 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 0.09 0.50 2.42 0.09 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.09 0.50 2.42 -0.09 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.27 0.50 2.42 -0.27 0.66" size="0.015" material="scorpio_chrome"/>
+      <geom type="capsule" fromto="2.42 -0.45 0.50 2.42 -0.45 0.66" size="0.015" material="scorpio_chrome"/>
+      <!-- Mahindra Twin-Peaks Center Badge -->
+      <geom type="cylinder" pos="2.43 0 0.60" size="0.04 0.015" zaxis="1 0 0" material="scorpio_chrome"/>
+      
+      <!-- Twin-Pod Projector LED Headlamps & Eyebrow DRLs -->
+      <geom type="cylinder" pos="2.41 0.74 0.60" size="0.065 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 0.61 0.60" size="0.060 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 -0.74 0.60" size="0.065 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="cylinder" pos="2.41 -0.61 0.60" size="0.060 0.02" zaxis="1 0 0" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.41 0.68 0.67" size="0.02 0.14 0.015" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.41 -0.68 0.67" size="0.02 0.14 0.015" material="scorpio_drl_led"/>
+      <!-- Sting C-Shaped Foglamp Housings in Lower Bumper -->
+      <geom type="box" pos="2.37 0.78 0.35" size="0.02 0.06 0.08" material="scorpio_drl_led"/>
+      <geom type="box" pos="2.37 -0.78 0.35" size="0.02 0.06 0.08" material="scorpio_drl_led"/>
+
+      <!-- Greenhouse Cabin & Dark Privacy Glass -->
+      <geom type="box" pos="-0.12 0 0.96" size="1.55 0.88 0.24" material="car_glass"/>
+      <geom type="box" pos="-0.12 0 1.22" size="1.50 0.85 0.035" material="scorpio_deep_forest"/>
+      <!-- Silver Roof Rails -->
+      <geom type="capsule" fromto="1.10 0.68 1.27 -1.25 0.68 1.27" size="0.025" material="scorpio_skid_silver"/>
+      <geom type="capsule" fromto="1.10 -0.68 1.27 -1.25 -0.68 1.27" size="0.025" material="scorpio_skid_silver"/>
+      <!-- Scorpio Sting Chrome Windowline Accent (D-Pillar) -->
+      <geom type="box" pos="-1.28 0.89 0.98" size="0.22 0.015 0.20" material="scorpio_chrome"/>
+      <geom type="box" pos="-1.28 -0.89 0.98" size="0.22 0.015 0.20" material="scorpio_chrome"/>
+      <!-- Shark-fin Antenna -->
+      <geom type="box" pos="-1.35 0 1.29" size="0.08 0.02 0.045" material="scorpio_cladding_matte"/>
+      <!-- Dual-Tone ORVM Side Mirrors -->
+      <geom type="box" pos="1.15 1.08 0.85" size="0.10 0.14 0.07" material="scorpio_deep_forest"/>
+      <geom type="box" pos="1.15 -1.08 0.85" size="0.10 0.14 0.07" material="scorpio_deep_forest"/>
+
+      <!-- Signature Tall Vertical Scorpio LED Taillamp Towers -->
+      <geom type="box" pos="-2.33 0.78 0.86" size="0.02 0.06 0.30" material="scorpio_vert_tail"/>
+      <geom type="box" pos="-2.33 -0.78 0.86" size="0.02 0.06 0.30" material="scorpio_vert_tail"/>
+      <!-- Tailgate Chrome Applique & Badging -->
+      <geom type="box" pos="-2.34 0 0.68" size="0.015 0.45 0.035" material="scorpio_chrome"/>
+      <!-- Roof Spoiler with Stop Lamp -->
+      <geom type="box" pos="-1.65 0 1.23" size="0.18 0.72 0.03" material="scorpio_deep_forest"/>
+      <geom type="box" pos="-1.74 0 1.23" size="0.02 0.16 0.015" material="scorpio_vert_tail"/>
+
+      <!-- R18 Diamond Cut Alloy Wheels -->
+      <geom type="cylinder" pos="1.40 0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.40 0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.40 0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.40 0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="1.40 -0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="1.40 -0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
+      <geom type="cylinder" pos="-1.40 -0.98 0.38" size="0.38 0.14" zaxis="0 1 0" material="tire_rubber"/>
+      <geom type="cylinder" pos="-1.40 -0.99 0.38" size="0.25 0.145" zaxis="0 1 0" material="wheel_alloy"/>
     </body>
 
     <!-- CAR 5: Commercial Navy Delivery Cargo Van (pos=-5.0 -18.0) -->
