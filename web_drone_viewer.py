@@ -435,8 +435,8 @@ class SimulationWorker:
                     vz_des = 0.0
 
                     # Precision PD position hold servo (active anti-drift lock)
-                    err_x = x_des - curr_pos[0]
-                    err_y = y_des - curr_pos[1]
+                    err_x = float(np.clip(x_des - curr_pos[0], -2.0, 2.0))
+                    err_y = float(np.clip(y_des - curr_pos[1], -2.0, 2.0))
                     ax_req = self.kp_pos * err_x - self.kd_pos * curr_vel[0]
                     ay_req = self.kp_pos * err_y - self.kd_pos * curr_vel[1]
                     psi_des = curr_yaw
@@ -458,8 +458,10 @@ class SimulationWorker:
                     z_des = float(target_wp[2]) if len(target_wp) > 2 else self.target_altitude
                     vz_des = 0.0
 
-                    ax_req = 1.45 * (target_wp[0] - curr_pos[0]) + 1.05 * (vx_des - curr_vel[0])
-                    ay_req = 1.45 * (target_wp[1] - curr_pos[1]) + 1.05 * (vy_des - curr_vel[1])
+                    pos_lead_x = float(np.clip(target_wp[0] - curr_pos[0], -2.5, 2.5))
+                    pos_lead_y = float(np.clip(target_wp[1] - curr_pos[1], -2.5, 2.5))
+                    ax_req = 0.85 * pos_lead_x + 1.25 * (vx_des - curr_vel[0])
+                    ay_req = 0.85 * pos_lead_y + 1.25 * (vy_des - curr_vel[1])
                     psi_des = float(np.arctan2(u_dir[1], u_dir[0]))
 
                     if is_damaged:
@@ -507,8 +509,10 @@ class SimulationWorker:
                     ax_b =  cos_psi * ax_req + sin_psi * ay_req
                     ay_b = -sin_psi * ax_req + cos_psi * ay_req
 
-                    pitch_des = float(np.clip( ax_b / 9.81, -0.55, 0.55))
-                    roll_des  = float(np.clip(-ay_b / 9.81, -0.55, 0.55))
+                    # Realistic commercial drone tilt clamp (max ~15.0 deg / 0.26 rad)
+                    MAX_TILT = 0.26
+                    pitch_des = float(np.clip( ax_b / 9.81, -MAX_TILT, MAX_TILT))
+                    roll_des  = float(np.clip(-ay_b / 9.81, -MAX_TILT, MAX_TILT))
 
                     yaw_err = (psi_des - curr_yaw + np.pi) % (2.0 * np.pi) - np.pi
                     tau_yaw = 1.35 * yaw_err - 0.45 * wz
