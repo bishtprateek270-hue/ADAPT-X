@@ -120,10 +120,12 @@ if [ "$HTTP_PORT" != "$PREF_HTTP" ]; then
     echo -e "${YELLOW}[i] Port $PREF_HTTP is occupied (e.g. by Docker). Automatically selected free port: ${GREEN}${HTTP_PORT}${NC}"
 fi
 
-echo -e " 3D Graphics Core  : ${CYAN}Photorealistic Urban City (Textured High-Rises, 3D Vehicles, Plaza Fountain)${NC}"
+echo -e " Neural Policy     : ${GREEN}25.6M Universal Transformer Policy + Online System-ID (100g to 20kg)${NC}"
+echo -e " Flight Dynamics   : ${GREEN}Commercial 15° Smooth Tilt Envelope (Cinematic Waypoint Guidance)${NC}"
+echo -e " 3D Graphics Core  : ${CYAN}Photorealistic Urban City (Mahindra Scorpio-N, High-Rises, Plaza Fountain)${NC}"
 echo -e " Rotor Dynamics    : ${CYAN}High-RPM Aerodynamic Motion Blur & Adaptive Throttle Inversion${NC}"
 echo -e " Mission Planner   : ${GREEN}Interactive 2D City Map (Click-to-Fly, Custom Patrol Routes & Zero-Drift Hover)${NC}"
-echo -e " Fail-Safe Core    : ${CYAN}Dynamic Allocation Rebalancing & DGX Neural RMA (Trajectory Hold with Dead Motors)${NC}"
+echo -e " Fail-Safe Core    : ${CYAN}Dynamic Allocation Rebalancing & Neural RMA (Trajectory Hold with Dead Motors)${NC}"
 echo -e " Anti-Collision    : ${GREEN}100% Guaranteed Urban Geofence Containment Field (Zero Building Strikes)${NC}"
 echo -e " Stream Engine     : ${CYAN}WebSocket 50 FPS Persistent Binary Stream + Instant HTTP Auto-Fallback${NC}"
 echo -e " Stream Resolution : ${GREEN}${RES}${NC} (HD Quality)"
