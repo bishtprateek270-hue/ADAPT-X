@@ -259,7 +259,7 @@ class CityObstacleMap:
         # --- 2. Cylindrical Street Furniture & Trees (Lamps, Gantries, Foliage) ---
         for ox, oy, r, h in CYLINDER_OBSTACLES:
             # Check elevation clearance first: ignore ground obstacles when flying overhead
-            if pz > (h + 0.6):
+            if pz > (h + 0.3):
                 continue
 
             dx = px - ox
@@ -275,9 +275,9 @@ class CityObstacleMap:
                 f_total[0] += f_mag * normal[0]
                 f_total[1] += f_mag * normal[1]
 
-                # If low, also assist with positive vertical lift over the obstacle
-                if pz < h + 0.5:
-                    f_total[2] += float(np.clip(14.0 * (h + 0.8 - pz), 0.0, 18.0))
+                # If below obstacle height, add gentle vertical clearance assist
+                if pz < h:
+                    f_total[2] += float(np.clip(6.0 * (h + 0.2 - pz), 0.0, 8.0))
 
         # --- 3. Outer City Geofence Containment Field (|x|, |y| < 21m) ---
         for axis_idx, coord in enumerate([px, py]):

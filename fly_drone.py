@@ -52,7 +52,8 @@ def run_drone_simulation(
         print(f" Injected Fail : NONE (Continuous Stable Flight - Zero Collisions)")
     print("=" * 75)
 
-    env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=28.0, max_altitude=16.0)
+    env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=42.0, max_altitude=45.0)
+    env.action_mode = "thrust"
     obs, _ = env.reset()
 
     l = env.arm_length

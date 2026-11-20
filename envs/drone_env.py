@@ -20,7 +20,7 @@ class CityDroneEnv(gym.Env):
     """
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
-    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.5), max_radius=28.0, max_altitude=16.0, max_steps=100000):
+    def __init__(self, model_path=None, target_pos=(0.0, 0.0, 4.5), max_radius=42.0, max_altitude=45.0, max_steps=100000):
         super().__init__()
         if mujoco is None:
             raise ImportError("MuJoCo is required. Install via `pip install mujoco`.")
@@ -282,7 +282,17 @@ class CityDroneEnv(gym.Env):
 
         action = np.asarray(action, dtype=np.float32)
         # Check whether action is normalized [-1, 1] or raw thrust Newtons
-        if getattr(self, "action_mode", "auto") == "normalized" or (np.all(action >= -1.5) and np.all(action <= 1.5)):
+        mode = getattr(self, "action_mode", "auto")
+        if mode == "normalized":
+            is_normalized = True
+        elif mode == "thrust":
+            is_normalized = False
+        else: # "auto"
+            # Auto mode: RL policies output signed actions spanning [-1, 1] with negative values
+            # Controllers sending raw thrust commands in Newtons are strictly non-negative [0, max_thrust]
+            is_normalized = bool(np.any(action < -0.05) and np.all(action >= -1.5) and np.all(action <= 1.5))
+
+        if is_normalized:
             cmd_thrust = np.zeros(4, dtype=np.float32)
             for i in range(4):
                 u = float(np.clip(action[i], -1.0, 1.0))

@@ -125,7 +125,8 @@ class WebSocketBroadcaster:
 class SimulationWorker:
     def __init__(self, target_altitude=5.2, width=1280, height=720, jpeg_quality=85):
         self.target_altitude = target_altitude
-        self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=28.0, max_altitude=16.0, max_steps=1000000)
+        self.env = CityDroneEnv(target_pos=(0.0, 0.0, target_altitude), max_radius=42.0, max_altitude=45.0, max_steps=1000000)
+        self.env.action_mode = "thrust"
         self.env.reset_adaptive()
         self.obstacle_map = getattr(self.env, "obstacle_map", CityObstacleMap(drone_radius=0.45))
 
@@ -485,11 +486,11 @@ class SimulationWorker:
                         vx_des *= speed_scale
                         vy_des *= speed_scale
 
-                # Inject APF repulsive acceleration into control vector
-                ax_req += float(np.clip(f_apf[0] / self.env.mass, -12.0, 12.0))
-                ay_req += float(np.clip(f_apf[1] / self.env.mass, -12.0, 12.0))
+                # Inject smooth APF repulsive acceleration into control vector
+                ax_req += float(np.clip(f_apf[0] / self.env.mass, -4.5, 4.5))
+                ay_req += float(np.clip(f_apf[1] / self.env.mass, -4.5, 4.5))
                 if f_apf[2] > 0.1:
-                    z_des = max(z_des, self.target_altitude + float(np.clip(f_apf[2] * 0.1, 0.0, 1.5)))
+                    z_des = max(z_des, self.target_altitude + float(np.clip(f_apf[2] * 0.04, 0.0, 0.6)))
 
                 # City Geofence Boundary Soft Repeller (contain within urban arena |x|, |y| < 21m)
                 if abs(curr_pos[0]) > 20.0:
@@ -560,9 +561,13 @@ class SimulationWorker:
                 # Step physics with adaptive history tracking
                 _obs, _hist, _reward, terminated, truncated, _ = self.env.step_adaptive(action)
                 if terminated or truncated:
-                    self.env.reset_adaptive()
-                    if self.damage_motor != "none":
-                        self.env.inject_rotor_fault("dead_motor", rotor=self.damage_motor)
+                    curr_z = float(self.env.data.qpos[2])
+                    curr_r = float(np.hypot(self.env.data.qpos[0], self.env.data.qpos[1]))
+                    # In interactive simulation, only reset on catastrophic ground impact or extreme out-of-world breach
+                    if curr_z < 0.35 or curr_r > self.env.max_radius or curr_z > self.env.max_altitude:
+                        self.env.reset_adaptive()
+                        if self.damage_motor != "none":
+                            self.env.inject_rotor_fault("dead_motor", rotor=self.damage_motor)
 
                 # Dynamically animate the plaza fountain water geyser & sparkling spray
                 fountain_crown_id = getattr(self, "fountain_crown_id", -1)
