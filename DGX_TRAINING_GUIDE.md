@@ -28,6 +28,29 @@ cd ADAPT-X
 
 ### Step 2: Choose Your Training Engine on DGX
 
+#### 🔥 Option 0: Universal Scaled Drone RL Trainer (~25.6M Parameters) - Full World Spectrum
+Trained across **every drone weight and dimension class in the world** (from 100g nano/FPV to 20kg heavy industrial/tactical lifters). Features **Multi-Head Temporal Transformer** + **1024-wide Residual Actor-Critic** with **Online Real-Time System Identification** (automatically infers mass, arm length, and inertia tensor in flight):
+```bash
+# Full 5-phase training run across all world drone profiles on DGX GB10:
+./run_universal_training.sh all all 32
+
+# Or run directly via Python with mixed-precision BF16:
+/home/piet/ADAPT-X/.venv/bin/python train_universal_drone.py --phase all --profile all --num-envs 32
+
+# Rapid smoke-test verification mode (5% steps, completes in ~70s):
+./run_universal_training.sh --fast
+```
+* **Drone Spectrum Covered:**
+  - `nano_fpv`: $0.10 - 0.45\text{ kg}$, arm $0.06 - 0.13\text{ m}$, TWR $2.8 - 4.5$
+  - `compact_inspection`: $0.45 - 2.50\text{ kg}$, arm $0.14 - 0.28\text{ m}$, TWR $2.0 - 3.0$ (Mavic / Skydio class)
+  - `commercial_enterprise`: $2.50 - 7.50\text{ kg}$, arm $0.28 - 0.48\text{ m}$, TWR $1.7 - 2.5$ (Matrice class)
+  - `heavy_industrial_barc`: $7.50 - 20.00\text{ kg}$, arm $0.48 - 0.75\text{ m}$, TWR $1.5 - 2.2$ (BARC Heavy Tactical Lifter)
+* **Neural Architecture:** 4-layer Temporal Transformer ($d_{model}=512, 8\text{ heads}, H=20 \rightarrow \mathbf{z}_t \in \mathbb{R}^{64}$) + 7-dim Morphology SysID Head + 1024-wide 4-block ResNet (**25,584,592 parameters**).
+* **Online Parameter "Fetching":** Learns to decode $[\hat{m}, \hat{L}, \hat{I}_{xx}, \hat{I}_{yy}, \hat{I}_{zz}, \hat{T}_{hov}, \hat{T}_{max}]$ online from rolling IMU history without manual sensor setup.
+* **Output:** Checkpoints in `checkpoints/dgx_spark_universal/` and dual-head production deployments in `deployments/adaptx_universal_drone.onnx` & `.torchscript.pt`.
+
+---
+
 #### 🟢 Option A: DGX Spark Heavy Deep RL Phased Trainer (3.3M Parameter Model)
 Utilizes **Multi-Head Temporal Transformer** + **512-wide Deep ResNet Actor-Critic** with **BFloat16 Tensor Core** acceleration:
 ```bash

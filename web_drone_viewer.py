@@ -625,7 +625,11 @@ class SimulationWorker:
                     "wp_dist": wp_dist_val,
                     "d_min_obs": round(float(d_min_obs), 2),
                     "collision_shield": "STANDBY HOVER (LOCKED)" if is_hover_locked else "ACTIVE (APF VORTEX)",
-                    "loop_mode": self.loop_waypoints
+                    "loop_mode": self.loop_waypoints,
+                    "mass": round(float(self.env.mass), 2),
+                    "arm_len": round(float(self.env.arm_length), 2),
+                    "profile": getattr(self.env, "current_profile", "standard"),
+                    "hover_thrust": round(float(self.env.hover_thrust_per_rotor), 1)
                 }
 
                 # Publish frame to condition variable & WebSocket broadcaster

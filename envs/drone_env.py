@@ -52,6 +52,22 @@ class CityDroneEnv(gym.Env):
         self.arm_length = 0.18
         self.yaw_torque_coeff = 0.02
 
+        # Thrust site IDs for dynamic arm length scaling across drone classes
+        self.thrust_site_names = ["thrust_site_fr", "thrust_site_fl", "thrust_site_rr", "thrust_site_rl"]
+        self.thrust_site_ids = [
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, name)
+            for name in self.thrust_site_names
+        ]
+        self.default_mass = float(self.mass)
+        self.default_arm_length = 0.18
+        self.twr = 2.4
+        self.max_thrust_per_rotor = float(self.twr * self.hover_thrust_per_rotor)
+        self.motor_tau = 0.035
+        self.current_thrust = np.full(4, self.hover_thrust_per_rotor, dtype=np.float32)
+        self.morphology_randomization = False
+        self.current_profile = "standard"
+        self.action_mode = "auto"
+
         # Rotor health state: [FR, FL, RR, RL] (1.0 = healthy, 0.0 = completely broken)
         self.rotor_health = np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
         self.fault_type = "none"
@@ -74,11 +90,13 @@ class CityDroneEnv(gym.Env):
         # Propeller rotation tracking
         self.prop_joint_names = ["prop_fr_joint", "prop_fl_joint", "prop_rr_joint", "prop_rl_joint"]
         self.prop_qpos_indices = []
+        self.prop_qvel_indices = []
         self.prop_spin_dirs = np.array([-1.0, 1.0, 1.0, -1.0], dtype=np.float32)  # FR CW, FL CCW, RR CCW, RL CW
         for name in self.prop_joint_names:
             try:
                 j_id = self.model.joint(name).id
                 self.prop_qpos_indices.append(self.model.jnt_qposadr[j_id])
+                self.prop_qvel_indices.append(self.model.jnt_dofadr[j_id])
             except Exception:
                 pass
         self.prop_angles = np.zeros(4, dtype=np.float32)
@@ -125,9 +143,91 @@ class CityDroneEnv(gym.Env):
         pt = self.obstacle_map.snap_to_safe_corridor(chosen[0], chosen[1], z=chosen[2])
         return pt.astype(np.float32)
 
+    def sample_universal_morphology(self, profile=None):
+        """
+        Samples drone physical morphology across the full spectrum of world quadrotors:
+          1. 'nano_fpv': 0.10 - 0.45 kg, arm 0.06 - 0.13 m, TWR 2.8 - 4.5, tau 0.018 - 0.030 s
+          2. 'compact_inspection': 0.45 - 2.50 kg, arm 0.14 - 0.28 m, TWR 2.0 - 3.0, tau 0.030 - 0.055 s
+          3. 'commercial_enterprise': 2.50 - 7.50 kg, arm 0.28 - 0.48 m, TWR 1.7 - 2.5, tau 0.050 - 0.085 s
+          4. 'heavy_industrial_barc': 7.50 - 20.00 kg, arm 0.48 - 0.75 m, TWR 1.5 - 2.2, tau 0.080 - 0.140 s
+        """
+        profiles = ["nano_fpv", "compact_inspection", "commercial_enterprise", "heavy_industrial_barc"]
+        if profile is None or profile == "random" or profile == "all":
+            profile = str(np.random.choice(profiles))
+
+        if profile == "nano_fpv":
+            mass = float(np.random.uniform(0.12, 0.45))
+            arm = float(np.random.uniform(0.06, 0.13))
+            twr = float(np.random.uniform(2.8, 4.5))
+            tau = float(np.random.uniform(0.018, 0.030))
+        elif profile == "compact_inspection":
+            mass = float(np.random.uniform(0.45, 2.50))
+            arm = float(np.random.uniform(0.14, 0.28))
+            twr = float(np.random.uniform(2.0, 3.0))
+            tau = float(np.random.uniform(0.030, 0.055))
+        elif profile == "commercial_enterprise":
+            mass = float(np.random.uniform(2.50, 7.50))
+            arm = float(np.random.uniform(0.28, 0.48))
+            twr = float(np.random.uniform(1.7, 2.5))
+            tau = float(np.random.uniform(0.050, 0.085))
+        else:  # heavy_industrial_barc
+            mass = float(np.random.uniform(7.50, 20.00))
+            arm = float(np.random.uniform(0.48, 0.75))
+            twr = float(np.random.uniform(1.5, 2.2))
+            tau = float(np.random.uniform(0.080, 0.140))
+
+        self.set_drone_morphology(mass=mass, arm_length=arm, twr=twr, tau=tau, profile_name=profile)
+        return self.get_true_morphology()
+
+    def set_drone_morphology(self, mass=1.5, arm_length=0.18, twr=2.2, tau=0.035, profile_name="custom"):
+        """Explicitly configures drone physical dimensions, mass, inertia, and actuator dynamics."""
+        self.mass = float(mass)
+        self.arm_length = float(arm_length)
+        self.twr = float(twr)
+        self.motor_tau = float(tau)
+        self.current_profile = profile_name
+
+        # Inertia tensor computation (rigid body quadrotor approximation)
+        I_xx = float(0.45 * self.mass * (self.arm_length ** 2))
+        I_yy = float(0.45 * self.mass * (self.arm_length ** 2))
+        I_zz = float(I_xx + I_yy)
+
+        # Update MuJoCo rigid body mass and inertia
+        self.model.body_mass[self.drone_body_id] = self.mass
+        self.model.body_inertia[self.drone_body_id] = [I_xx, I_yy, I_zz]
+
+        # Update thruster moment arms in MuJoCo
+        signs = [(1.0, -1.0), (1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)]
+        for s_id, (sx, sy) in zip(self.thrust_site_ids, signs):
+            if s_id != -1:
+                self.model.site_pos[s_id] = [sx * self.arm_length, sy * self.arm_length, 0.045]
+
+        # Update hover thrust and max thrust limits
+        self.hover_thrust_total = float(self.mass * self.gravity)
+        self.hover_thrust_per_rotor = float(self.hover_thrust_total / 4.0)
+        self.max_thrust_per_rotor = float(self.twr * self.hover_thrust_per_rotor)
+        self.model.actuator_ctrlrange[:, 1] = self.max_thrust_per_rotor
+        self.current_thrust = np.full(4, self.hover_thrust_per_rotor, dtype=np.float32)
+
+    def get_true_morphology(self):
+        """Returns 7-dim ground truth morphology vector: [mass, arm, I_xx, I_yy, I_zz, hover_thrust, max_thrust]."""
+        I = self.model.body_inertia[self.drone_body_id]
+        return np.array([
+            float(self.mass),
+            float(self.arm_length),
+            float(I[0]),
+            float(I[1]),
+            float(I[2]),
+            float(self.hover_thrust_per_rotor),
+            float(self.max_thrust_per_rotor)
+        ], dtype=np.float32)
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         mujoco.mj_resetData(self.model, self.data)
+
+        if getattr(self, "morphology_randomization", False):
+            self.sample_universal_morphology()
 
         if getattr(self, "randomize_target", False):
             self.target_pos = self.sample_safe_avenue_target()
@@ -149,6 +249,7 @@ class CityDroneEnv(gym.Env):
         self.fault_type = "none"
         self.fault_rotor = None
         self.current_step = 0
+        self.current_thrust = np.full(4, self.hover_thrust_per_rotor, dtype=np.float32)
 
         mujoco.mj_forward(self.model, self.data)
         return self._get_obs(), {}
@@ -179,11 +280,32 @@ class CityDroneEnv(gym.Env):
     def step(self, action):
         self.current_step += 1
 
-        # Clip action to physical limits
-        action = np.clip(action, 0.0, 12.0)
+        action = np.asarray(action, dtype=np.float32)
+        # Check whether action is normalized [-1, 1] or raw thrust Newtons
+        if getattr(self, "action_mode", "auto") == "normalized" or (np.all(action >= -1.5) and np.all(action <= 1.5)):
+            cmd_thrust = np.zeros(4, dtype=np.float32)
+            for i in range(4):
+                u = float(np.clip(action[i], -1.0, 1.0))
+                if u >= 0.0:
+                    cmd_thrust[i] = self.hover_thrust_per_rotor + u * (self.max_thrust_per_rotor - self.hover_thrust_per_rotor)
+                else:
+                    cmd_thrust[i] = self.hover_thrust_per_rotor * (1.0 + u)
+        else:
+            cmd_thrust = np.clip(action, 0.0, getattr(self, "max_thrust_per_rotor", 12.0))
 
         # Apply hardware degradation/damage
-        actual_thrust = action * self.rotor_health
+        target_thrust = cmd_thrust * self.rotor_health
+
+        # First-order motor time-constant lag (ESC dynamics)
+        tau = getattr(self, "motor_tau", 0.035)
+        dt = getattr(self, "dt", 0.005) * 4.0
+        alpha = float(np.clip(dt / (tau + dt), 0.1, 1.0))
+        if not hasattr(self, "current_thrust") or self.current_thrust is None:
+            self.current_thrust = target_thrust.copy()
+        else:
+            self.current_thrust = (1.0 - alpha) * self.current_thrust + alpha * target_thrust
+
+        actual_thrust = self.current_thrust
         self.data.ctrl[:] = actual_thrust
 
         # Animate realistic high-speed propeller spinning and dynamic motion blur
@@ -205,7 +327,11 @@ class CityDroneEnv(gym.Env):
                     if blur_gid != -1:
                         self.model.geom_rgba[blur_gid][3] = 0.0
 
-        # Apply realistic aerodynamic translational and rotational air damping
+        # Scale aerodynamic damping and guidance forces dynamically with drone mass and inertia
+        mass_scale = float(np.clip(self.mass / 1.50, 0.08, 14.0))
+        inertia_val = float(self.model.body_inertia[self.drone_body_id][0])
+        inertia_scale = float(np.clip(inertia_val / 0.027, 0.01, 25.0))
+
         vel = self.data.qvel[0:3]
         omega = self.data.qvel[3:6]
         if self.fault_type != "none":
@@ -222,29 +348,31 @@ class CityDroneEnv(gym.Env):
             p_err = np.array([p_target[0] - self.data.qpos[0], p_target[1] - self.data.qpos[1]])
             v_target = getattr(self, "target_velocity", np.zeros(2))
             v_err = v_target - vel[0:2]
-            f_guidance = np.clip(2.6 * p_err + 3.2 * v_err, -8.0, 8.0)
+            f_guidance = np.clip(2.6 * p_err + 3.2 * v_err, -8.0, 8.0) * mass_scale
 
             # Active APF building wall repulsion in damaged mode (attenuated when near target hover)
             f_apf, _ = self.obstacle_map.compute_apf_force(self.data.qpos[0:3], vel)
-            f_apf_clamped = np.clip(f_apf[0:2], -6.0, 6.0)
+            f_apf_clamped = np.clip(f_apf[0:2], -6.0, 6.0) * mass_scale
 
-            self.data.qfrc_applied[0:2] = f_guidance + f_apf_clamped - 0.20 * vel[0:2]
-            self.data.qfrc_applied[2] = -0.25 * vel[2]
-            self.data.qfrc_applied[3] = -0.45 * omega[0] - 4.5 * roll
-            self.data.qfrc_applied[4] = -0.45 * omega[1] - 4.5 * pitch
-            self.data.qfrc_applied[5] = -0.55 * omega[2]
+            self.data.qfrc_applied[0:2] = f_guidance + f_apf_clamped - (0.20 * vel[0:2] * mass_scale)
+            self.data.qfrc_applied[2] = -0.25 * vel[2] * mass_scale
+            self.data.qfrc_applied[3] = (-0.45 * omega[0] - 4.5 * roll) * inertia_scale
+            self.data.qfrc_applied[4] = (-0.45 * omega[1] - 4.5 * pitch) * inertia_scale
+            self.data.qfrc_applied[5] = (-0.55 * omega[2]) * inertia_scale
         else:
-            self.data.qfrc_applied[0:3] = -0.25 * vel
-            self.data.qfrc_applied[3:6] = -0.025 * omega
+            self.data.qfrc_applied[0:3] = -0.25 * vel * mass_scale
+            self.data.qfrc_applied[3:6] = -0.025 * omega * inertia_scale
 
         # MuJoCo sub-steps to reach 50 Hz control rate (0.005s * 4 = 0.02s dt)
         for _ in range(4):
             mujoco.mj_step(self.model, self.data)
 
-        # Keep propeller angles synchronized in data.qpos after physics integration
+        # Keep propeller angles synchronized in data.qpos and zero rotational hinge drift
         if len(self.prop_qpos_indices) == 4:
             for i in range(4):
                 self.data.qpos[self.prop_qpos_indices[i]] = self.prop_angles[i]
+                if i < len(self.prop_qvel_indices):
+                    self.data.qvel[self.prop_qvel_indices[i]] = 0.0
 
         obs = self._get_obs()
 
@@ -282,7 +410,8 @@ class CityDroneEnv(gym.Env):
         r_z = np.exp(-3.0 * z_err)
         r_vel = np.exp(-0.8 * v_horiz)
 
-        reward = float(6.0 * r_target + 4.0 * r_z + 2.0 * r_vel + 2.0 * upright - penalty_obstacle - 0.01 * np.sum(action))
+        norm_effort = 0.002 * np.sum(actual_thrust / max(0.1, self.hover_thrust_per_rotor))
+        reward = float(6.0 * r_target + 4.0 * r_z + 2.0 * r_vel + 2.0 * upright - penalty_obstacle - norm_effort)
 
         # Terminate if crashed to ground, hit building/obstacle, breached urban geofence radius, or breached ceiling
         ground_crash = bool(curr_pos[2] < 0.45)
@@ -310,9 +439,13 @@ class CityDroneEnv(gym.Env):
             "rotor": self.fault_rotor,
             "ground_crash": ground_crash,
             "building_perimeter": building_perimeter,
+            "true_morphology": self.get_true_morphology().tolist(),
+            "mass": float(self.mass),
+            "arm_length": float(self.arm_length),
+            "profile": self.current_profile,
+            "hover_thrust": float(self.hover_thrust_per_rotor),
+            "max_thrust": float(self.max_thrust_per_rotor),
         }
-
-        return obs, reward, terminated, truncated, info
 
         return obs, reward, terminated, truncated, info
 

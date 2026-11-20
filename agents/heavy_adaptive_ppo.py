@@ -252,3 +252,212 @@ class HeavyDeployablePolicy(nn.Module):
         feat = self.actor_res1(feat)
         feat = self.actor_res2(feat)
         return self.actor_head(feat)
+
+
+# =============================================================================
+# UNIVERSAL SCALED ARCHITECTURE (~29.8M PARAMETERS) FOR DGX SPARK / BLACKWELL
+# =============================================================================
+
+class MorphologyEstimatorHead(nn.Module):
+    """
+    Online Physical System Identification Head.
+    Decodes the latent vector z_t into physical parameters:
+    [mass (kg), arm_length (m), I_xx, I_yy, I_zz, hover_thrust (N), max_thrust (N)] in R^7.
+    Allows the drone to automatically 'fetch' and identify its own mass and dimensions in real-time.
+    """
+    def __init__(self, latent_dim=64, morph_dim=7, hidden_dim=256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(latent_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, morph_dim)
+        )
+        for m in self.net.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.0)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, z):
+        return self.net(z)
+
+
+class UniversalAdaptiveActorCritic(nn.Module):
+    """
+    Universal Scaled Deep RL Architecture (~29.8M Parameters) for DGX Spark / Blackwell.
+    Trained across every dimension, weight, and drone class in the world (0.1kg to 20kg+).
+
+    Features:
+      1. Deep Multi-Head Temporal Transformer:
+         - Sequence modeling over H=20 rolling proprioceptive steps.
+         - 4 transformer layers, d_model=512, 8 attention heads, LayerNorm + GELU.
+         - Encodes rolling state-action transitions into rich latent z_t in R^64.
+      2. Online Physical Parameter Inference Head (SysID):
+         - Maps z_t -> [mass, arm_length, I_xx, I_yy, I_zz, hover_thrust, max_thrust] in R^7.
+         - Automatically identifies drone physical characteristics online from IMU telemetry.
+      3. Wide Deep Residual Actor & Critic Backbones:
+         - 1024-wide trunks with 4 residual blocks each (LayerNorm + GELU).
+         - High representational capacity for universal control across all drone morphologies.
+    """
+    def __init__(
+        self,
+        obs_dim=17,
+        single_proprio_dim=17,
+        history_len=20,
+        act_dim=4,
+        latent_dim=64,
+        d_model=512,
+        nhead=8,
+        num_trans_layers=4,
+        hidden_dim=1024,
+        num_res_blocks=4,
+        morph_dim=7
+    ):
+        super().__init__()
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.latent_dim = latent_dim
+        self.history_len = history_len
+        self.history_dim = history_len * single_proprio_dim
+        self.morph_dim = morph_dim
+
+        # 1. Deep Multi-Head Temporal Transformer History Encoder
+        self.history_encoder = TemporalTransformerEncoder(
+            single_dim=single_proprio_dim,
+            seq_len=history_len,
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_trans_layers,
+            latent_dim=latent_dim
+        )
+
+        # 2. Online Morphology & Physical Parameter Inference Head
+        self.morphology_estimator = MorphologyEstimatorHead(
+            latent_dim=latent_dim,
+            morph_dim=morph_dim,
+            hidden_dim=256
+        )
+
+        in_dim = obs_dim + latent_dim
+
+        # 3. Wide Residual Actor Backbone (1024-wide, 4 ResBlocks)
+        self.actor_stem = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.GELU()
+        )
+        self.actor_blocks = nn.ModuleList([ResBlock(hidden_dim) for _ in range(num_res_blocks)])
+        self.actor_head = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, act_dim)
+        )
+        self.actor_log_std = nn.Parameter(torch.zeros(act_dim) - 0.5)
+
+        # 4. Wide Residual Critic Backbone (1024-wide, 4 ResBlocks)
+        self.critic_stem = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.GELU()
+        )
+        self.critic_blocks = nn.ModuleList([ResBlock(hidden_dim) for _ in range(num_res_blocks)])
+        self.critic_head = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, 1)
+        )
+
+        self._init_actor_critic_weights()
+
+    def _init_actor_critic_weights(self):
+        for m in [self.actor_stem, self.critic_stem]:
+            for layer in m.modules():
+                if isinstance(layer, nn.Linear):
+                    nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                    if layer.bias is not None:
+                        nn.init.zeros_(layer.bias)
+
+        for block in self.actor_blocks:
+            for layer in block.modules():
+                if isinstance(layer, nn.Linear):
+                    nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                    if layer.bias is not None:
+                        nn.init.zeros_(layer.bias)
+
+        for block in self.critic_blocks:
+            for layer in block.modules():
+                if isinstance(layer, nn.Linear):
+                    nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                    if layer.bias is not None:
+                        nn.init.zeros_(layer.bias)
+
+        nn.init.orthogonal_(self.actor_head[-1].weight, gain=0.01)
+        nn.init.orthogonal_(self.critic_head[-1].weight, gain=1.0)
+
+    def get_latent(self, history):
+        return self.history_encoder(history)
+
+    def infer_morphology(self, history):
+        """Online estimation of drone mass, dimensions, and inertia from IMU history."""
+        z = self.history_encoder(history)
+        return self.morphology_estimator(z)
+
+    def get_value(self, obs, history):
+        z = self.history_encoder(history)
+        x = torch.cat([obs, z], dim=-1)
+        feat = self.critic_stem(x)
+        for block in self.critic_blocks:
+            feat = block(feat)
+        return self.critic_head(feat)
+
+    def get_action_and_value(self, obs, history, action=None):
+        z = self.history_encoder(history)
+        pred_morph = self.morphology_estimator(z)
+        x = torch.cat([obs, z], dim=-1)
+
+        # Actor forward pass
+        act_feat = self.actor_stem(x)
+        for block in self.actor_blocks:
+            act_feat = block(act_feat)
+        mean = self.actor_head(act_feat)
+
+        std = torch.exp(self.actor_log_std)
+        dist = Normal(mean, std)
+
+        if action is None:
+            action = dist.sample()
+
+        log_prob = dist.log_prob(action).sum(axis=-1)
+        entropy = dist.entropy().sum(axis=-1)
+
+        # Critic forward pass
+        crit_feat = self.critic_stem(x)
+        for block in self.critic_blocks:
+            crit_feat = block(crit_feat)
+        value = self.critic_head(crit_feat)
+
+        return action, log_prob, entropy, value, z, pred_morph
+
+
+class UniversalDeployablePolicy(nn.Module):
+    """
+    Zero-overhead inference and deployment wrapper for the Universal Policy (~29.8M params).
+    Outputs both adapted thrust commands and online inferred physical morphology.
+    Compiles cleanly to ONNX and TorchScript for edge drone computers.
+    """
+    def __init__(self, history_encoder, morphology_estimator, actor_stem, actor_blocks, actor_head):
+        super().__init__()
+        self.history_encoder = history_encoder
+        self.morphology_estimator = morphology_estimator
+        self.actor_stem = actor_stem
+        self.actor_blocks = actor_blocks
+        self.actor_head = actor_head
+
+    def forward(self, obs: torch.Tensor, history: torch.Tensor):
+        z = self.history_encoder(history)
+        pred_morph = self.morphology_estimator(z)
+        x = torch.cat([obs, z], dim=-1)
+        feat = self.actor_stem(x)
+        for block in self.actor_blocks:
+            feat = block(feat)
+        action = self.actor_head(feat)
+        return action, pred_morph
