@@ -169,13 +169,17 @@ class SimulationWorker:
             [-0.02,  0.02,  0.02, -0.02 ]
         ], dtype=np.float64)
 
-        # Try loading trained ONNX production model
+        # Try loading trained ONNX production model (prefer 25.6M universal scaled model)
         self.ort_session = None
-        onnx_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deployments", "adaptx_heavy_drone.onnx")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        universal_onnx = os.path.join(base_dir, "deployments", "adaptx_universal_drone.onnx")
+        heavy_onnx = os.path.join(base_dir, "deployments", "adaptx_heavy_drone.onnx")
+        onnx_model_path = universal_onnx if os.path.exists(universal_onnx) else heavy_onnx
+
         if ONNX_AVAILABLE and os.path.exists(onnx_model_path):
             try:
                 self.ort_session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
-                print(f"[SimulationWorker] Loaded ADAPT-X Heavy Drone ONNX Model: {onnx_model_path}")
+                print(f"[SimulationWorker] Loaded ADAPT-X Universal Production Model: {onnx_model_path}")
             except Exception as e:  # noqa: BLE001
                 print(f"[SimulationWorker] ONNX load warning: {e}")
 
